@@ -1,0 +1,37 @@
+# Python and Jupyter
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+venv/
+
+# macOS
+.DS_Store
+
+# Data: raw data is downloaded by report/01-Data, processed data is regenerated.
+# Commit the code that makes these, never the files (GitHub size limits, and
+# binary data bloats the history for everyone).
+data/raw/
+data/processed/
+
+# Model weights and checkpoints: large binaries, regenerate them from the code
+# (or download pre-trained weights in the notebook that uses them).
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+checkpoints/
+runs/
+lightning_logs/
+
+# Hugging Face / PyTorch caches if pointed inside the repo
+.cache/
+
+# R / RStudio (the unit's workshops are in R)
+.Rhistory
+.RData
+.Rproj.user/
+
+# Other units' lecture notes: kept locally for reading, cited in the report,
+# never published (the repo is public and the notes aren't ours to share).
+Oscar/references/
