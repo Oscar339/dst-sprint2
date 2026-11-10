@@ -23,8 +23,15 @@ already tells us?
 [cs.cmu.edu/~ark/10K](https://www.cs.cmu.edu/~ark/10K). No login, about 350 MB.
 
 - About **29,000 annual reports** ("10-Ks") from US public companies, 1996–2006.
-- For each report we use Item 7, **management's discussion of the year**
-  (typically about 10,000 words, already split into words).
+- For each report we use two sections:
+  - **Item 7, management's discussion of the year** (MD&A), typically about
+    10,000 words, included in the corpus already split into words
+  - **Item 1, the business description** (what the company does, its
+    markets, competitors and customers), typically about 4,900 words. This
+    comes from **EDGAR-CORPUS** (Loukas et al., 2021), which has every 10-K
+    already split into sections. We match it to our reports by SEC company
+    number and year. In a 2006 test about 97% matched; other years still need
+    checking.
 - Already attached to each report:
   - **volatility in the 12 months before** the filing (the baseline)
   - **volatility in the 12 months after** the filing (what we predict)
@@ -38,13 +45,17 @@ already tells us?
 
 - The data is from 1996–2006, not today.
 - Companies that were delisted in the year after filing have no label (under 4%).
-- Only Item 7 is included, not the "Risk Factors" section.
+- No "Risk Factors" section (Item 1A). Companies only had to include it from
+  late 2005, so it is missing for almost all our labelled years (1% of 2004
+  filings, 53% of 2005, 96% of 2006).
+- Some reports won't match in EDGAR-CORPUS for Item 1; we report how many.
 
 **Other sources we considered** (to go in the data-search log, which the brief rewards):
 
 | Source | Why not chosen |
 |---|---|
-| EDGAR-CORPUS (Hugging Face) | Every 10-K 1993–2020 but 40 GB, and no prices; we'd have to match companies to prices ourselves |
+| EDGAR-CORPUS (Hugging Face) | **Used for Item 1 only.** Every 10-K 1993–2020 (40 GB) but no prices, so not usable as the main dataset |
+| Stocks-Yearly-Sections10K (Hugging Face) | Every 10-K section since 2001 with tickers, but downloads need a paid subscription, and no prices |
 | Yahoo Finance prices | Mostly missing companies that no longer exist (survivorship bias) |
 | Bloomberg Terminal | Only Oscar has access, in person; the data can't go in a public repo |
 | NCCU extended 10-K corpus (1996–2013) | Website security certificate has expired; worth retrying |
@@ -55,10 +66,10 @@ We **use** someone else's model to read the reports, and we **build and
 train our own** neural network to predict volatility from what it read.
 
 ```
-Annual report (10,000 words)
+Annual report: Item 1 + Item 7 (~15,000 words)
         │
         ▼
- Cut into ~23 chunks
+ Cut into ~35 chunks
         │
         ▼
 ┌─────────────────────┐
@@ -67,7 +78,7 @@ Annual report (10,000 words)
 └─────────────────────┘
         │
         ▼
- 23 lists of 768 numbers + last year's volatility
+ ~35 lists of 768 numbers + last year's volatility
         │
         ▼
 ┌─────────────────────┐
@@ -85,7 +96,7 @@ Annual report (10,000 words)
   text. It can only read about 400 words at a time, which is why we cut each
   report into chunks. Reusing a trained model like this is **transfer
   learning**, which the brief lists as an approved approach.
-- **Our network** combines the ~23 chunk summaries into one per report, using
+- **Our network** combines the ~35 chunk summaries into one per report, using
   an **attention** layer that learns which chunks matter most, then predicts
   volatility. Most of the implementation marks come from this part.
 
@@ -102,6 +113,35 @@ Annual report (10,000 words)
 | FinBERT + **our attention network** | **yes** | **yes** | **Main model** |
 | A second FinBERT (Yang et al., 2020, trained on company reports) | yes | partly | Which pre-trained model reads better? |
 | Fine-tuned FinBERT (stretch goal) | yes | partly | Adjust FinBERT itself; needs a Colab GPU |
+
+### Which part of the report carries the risk information?
+
+We run the main models three ways: **Item 7 only**, **Item 1 only**, and
+**both**. That answers a simple, clear question for the report: does the
+business description or management's discussion say more about future risk?
+It also shows whether the attention network learns to focus on one section.
+
+### Stretch goal: a modern check with Risk Factors
+
+The main study stays on 1996–2006. If time allows, we also test the best
+models on **recent filings (e.g. 2016–2019) that include Risk Factors**:
+
+- Text (Items 1, 1A and 7) from EDGAR-CORPUS.
+- Volatility **calculated by us** from daily Yahoo Finance prices (`yfinance`),
+  as the standard deviation of daily returns over the 12 months after filing,
+  the same definition as the 2009 paper.
+- Companies are matched to tickers with the SEC's company list.
+- **Known weakness:** Yahoo and the SEC list mostly cover companies still listed
+  today, so companies that failed or were bought drop out (survivorship bias).
+  We measure how many drop out and say so. A test on 517 filings from 2018
+  (10 Nov) found only **44% usable** with Yahoo prices: 81% stated their
+  ticker in the report, and only 55% of those tickers still had Yahoo prices
+  (missing ones include bankrupt Bed Bath & Beyond and acquired Anadarko).
+  So with Yahoo this check is heavily biased. If the university has **WRDS**
+  (which provides CRSP, the same price source as the main labels), we use that
+  instead and the problem goes away. Ask the library.
+- This answers two of the brief's points: does the model still work on recent
+  data, and how does our dataset compare with a real-world setting?
 
 ### How we score models
 
@@ -135,7 +175,8 @@ From Oscar's feasibility check (7–8 Nov), on his Mac:
 | FinBERT vs word counts | Roughly level, could go either way | **Guess, untested** |
 | Our attention network | Needs tuning; overfit badly in a small first test | Measured on a small sample only |
 | Speed | FinBERT about 27 chunks/second on the Mac GPU, about 3× the CPU; time grows in proportion to data | **Measured** |
-| Time to read ~7,000 reports with FinBERT | About 3 hours on the Mac, once; then everyone reuses the saved output | Estimated from the measured speed |
+| Time to read ~7,000 reports with FinBERT | About 3 hours on the Mac for Item 7, about 4.5 hours with Item 1 added; done once, then everyone reuses the saved output | Estimated from the measured speed |
+| Item 1 vs Item 7 | Unknown; MD&A is the section the paper used, so it may carry more | **Untested** |
 
 **We should agree now** that "the neural network didn't beat the simple model"
 is an acceptable result. The brief rewards correct methods and honest
@@ -149,8 +190,9 @@ Owners are suggestions; to be agreed with equity.
 - [ ] Agree the topic, the split of work and equity (all)
 - [ ] Add everyone's names and equity to the README (all)
 - [ ] `report/01-Data.ipynb`: download the data, remove the duplicate reports, explore it, make the plots (volatility before vs after, report length over time) (**Data**)
+- [ ] Download Item 1 from EDGAR-CORPUS for the years we use, match it to our reports, and record how many match each year (**Data**)
 - [ ] Write the data-search log in `data/README.md` (**Data**)
-- [ ] Read FinBERT over ~7,000 reports (2004–06) once; save the output to OneDrive, not GitHub (**Neural**)
+- [ ] Read FinBERT over ~7,000 reports (2004–06), Item 1 and Item 7 kept separate, once; save the output to OneDrive, not GitHub (**Neural**)
 - [ ] Start the reading list: Kogan 2009, Loughran & McDonald 2011, Araci 2019, Yang 2020, EDGAR-CORPUS 2021, FETILDA 2022, Engle 1982 (all)
 
 ### Week of 16 Nov: models
@@ -163,9 +205,12 @@ Owners are suggestions; to be agreed with equity.
 
 ### Week of 23 Nov: robustness and scale
 - [ ] Score every model on test years 2003–06, both training windows, with confidence intervals (**Data**)
+- [ ] Compare Item 1 only vs Item 7 only vs both (**Data** + **Neural**)
 - [ ] Plot which chunks the attention network focuses on (**Neural**)
 - [ ] Write the 1000× argument, with the timing plots (**Scale**)
 - [ ] Stretch: fine-tune FinBERT on Colab (**Neural** + **Scale**)
+- [ ] Stretch: modern check on 2016–19 filings with Risk Factors; Yahoo prices, or CRSP via WRDS if available (**Data** + **Neural**)
+- [ ] Ask the library whether Bristol has WRDS / CRSP (anyone, this week)
 - [ ] Draft `report/` notebooks: introduction, data, models, results, scale, conclusion (all)
 
 ### By Monday 30 Nov, 12:00: finish
@@ -185,7 +230,8 @@ Owners are suggestions; to be agreed with equity.
 | Our attention network overfits | More training data, dropout, early stopping, averaging over seeds |
 | FinBERT reading takes too long | Do it once, early, and share the output; use Colab if needed |
 | Old data (1996–2006) | Discuss how it compares with today's filings in the report |
-| Three weeks is tight | Fine-tuning is a stretch goal only; the core plan works without it |
+| Three weeks is tight | Fine-tuning and the modern check are stretch goals only; the core plan works without them |
+| Modern check is biased towards survivors | Measure and report the drop-out; use CRSP via WRDS if available |
 
 ## References (start of list)
 
