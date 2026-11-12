@@ -165,7 +165,7 @@ models on **recent filings (e.g. 2016–2019) that include Risk Factors**:
 
 ## 4. What we expect
 
-From Oscar's feasibility check (7–8 Nov), on his Mac:
+From quick test runs on Oscar's Mac (7–10 Nov). The project re-measures all of these in its own notebooks:
 
 | Result | Expectation | How sure |
 |---|---|---|
