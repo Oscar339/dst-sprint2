@@ -46,8 +46,9 @@ source.
 All report content is in `report/`, numbered `NN-Name.ext` in reading order.
 _To be filled in as the report is written._
 
-1. `01-Data.ipynb` — getting the data, exploring it, and any shared split.
-   **Run this first**: later notebooks load its output.
+1. `01-Introduction.ipynb` — the question, earlier work, our approach.
+2. `02-Data.ipynb` — the data, how it was joined and checked, and the shared
+   train/test years (`data/output/splits.csv`), which later notebooks load.
 
 ### Requirements
 
@@ -62,7 +63,8 @@ pip install -r requirements.txt
 Neural networks use [PyTorch](https://pytorch.org/). It runs on CPU; it uses a
 GPU (CUDA, or Apple `mps`) automatically where the notebook supports it.
 
-Data is downloaded by `report/01-Data.ipynb` into `data/raw/` (not committed).
+Data is downloaded and built by the steps listed at the top of
+`report/02-Data.ipynb` into `data/raw/` and `data/processed/` (not committed).
 Any manual step is stated in the notebook where it happens.
 
 ## Evidence
