@@ -22,18 +22,17 @@ def frame(d):
                       d["info"].reset_index(drop=True)], axis=1)
 
 
-FIRST_YEAR = 1996
 TEST_YEARS = range(2001, 2007)
 
-# Training windows. Each maps a test year T to the filing years used for training.
-#   paper / strict      : the two windows agreed in report/02-Data.ipynb (data/output/splits.csv)
-#   last year, all prior: one year vs all the history, both with strict's one-year gap, so no
-#                         training label (12 months after filing) overlaps the test year
+# Training windows, as agreed in report/02-Data.ipynb (data/output/splits.csv). Each maps a test
+# year T to the filing years used for training:
+#   paper : the five years before T (Kogan et al., 2009)
+#   strict: four years ending two years before T, so no training label (12 months after filing)
+#           overlaps the test year
+# Hyperparameters are tuned on the last of the training years (report/02's rule).
 WINDOWS = {
     "paper": lambda T: range(T - 5, T),
     "strict": lambda T: range(T - 5, T - 1),
-    "last year": lambda T: range(T - 2, T - 1),
-    "all prior": lambda T: range(FIRST_YEAR, T - 1),
 }
 
 

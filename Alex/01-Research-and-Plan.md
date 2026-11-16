@@ -46,19 +46,16 @@ throws away information and loses the comparison with the paper.
 
 A report's label covers the 12 months after filing, so a report filed in December 2005 has a label running into
 2006. In real use that label is not known yet when a 2006 report arrives, so training on it uses information from
-the future. `report/02` therefore fixed two windows, and I add two more to ask whether more data or more recent
-data is better:
+the future. Oscar therefore fixed two windows in `report/02` (saved in `data/output/splits.csv`), and every model
+in the project uses them:
 
 | Window | Years for test year $T$ | Pros | Cons |
 |---|---|---|---|
 | paper | $T-5 \dots T-1$ | Same as Kogan et al., so directly comparable | Last year's labels overlap the test year |
 | strict | $T-5 \dots T-2$ | No overlap with the test year | One year less data |
-| last year | $T-2$ only | The most recent data, about 2,000–3,000 reports | Small - a neural network may overfit |
-| all prior | 1996 to $T-2$ | The most data, up to 21,000 reports | Older reports may be less relevant |
 
-Together, last year, strict and all prior trace a learning curve: how the error changes as the training data
-grows. This links to the brief's scaling question - if the error is still falling as we add years, more data
-would genuinely help at 1000× the scale.
+`report/02` also sets the rule for hyperparameters: they are tuned on the last training year, never on the test
+year. For the neural networks, that year is also the one used for early stopping.
 
 ## 4. Telling whether a difference is real
 
@@ -86,8 +83,8 @@ suit FinBERT's dimensions, as none of them means anything on its own. Ridge keep
 $$\hat\beta_\lambda = (X^\top X + \lambda I)^{-1} X^\top y, \qquad X\hat\beta_\lambda = \sum_j u_j \, \frac{d_j^2}{d_j^2 + \lambda} \, u_j^\top y,$$
 where $X = U D V^\top$. Directions with a lot of spread across reports are kept almost whole, and those with
 little spread, where the fit would chase noise, are shrunk towards zero (Hastie, Tibshirani & Friedman, 2009,
-§3.4.1). The inputs are standardised on the training rows, and $\lambda$ is chosen by generalised
-cross-validation (GCV; Golub, Heath & Wahba, 1979), which works in every window, including the one-year one.
+§3.4.1). The inputs are standardised on the training rows, and $\lambda$ is chosen on the last training year
+(section 3): fit on the other years, score the last one, keep the best $\lambda$ and refit on the whole window.
 
 ## 6. How a report goes into the model
 
@@ -126,11 +123,11 @@ fine-tuning FinBERT beat keeping it frozen by about 5% on volatility.
 |---|---|---|
 | Target and score | MSE on log volatility, test years 2001–2006 | Matches Kogan et al., and logs stop the most volatile companies dominating (section 2) |
 | Baselines | Copy last year, and a straight line fitted on it | Copying is the paper's baseline; the line uses last year's volatility as well as a one-number rule can, so it is the bar the text has to clear |
-| Training windows | paper, strict, last year, all prior | Comparable with the paper, no look-ahead, and a learning curve (section 3) |
+| Training windows | paper and strict, from `data/output/splits.csv` | Oscar's windows: comparable with the paper, and one with no look-ahead (section 3) |
 | Uncertainty | Paired bootstrap per test year, and consistency across years | Section 4 |
 | Linear baseline for the networks | Ridge on the averaged chunk vectors, fitted to the line's residual | Sections 5 and 6 |
 | Inputs | Item 1, Item 7 and both | Which section carries the risk information |
-| Choosing $\lambda$ | GCV in every window | Works for the one-year window too |
+| Choosing $\lambda$ | On the last training year | `report/02`'s rule, the same one the networks use for early stopping |
 | Shared code | `scoring.py`: every model is a function `predict(df, train, test)` | So Louis's MLP and the attention network are scored exactly the same way |
 | Then | The attention network, or a second encoder if ridge finds nothing | Ridge clearly beating the line means the vectors are useful; if not, the vectors are the bottleneck |
 
@@ -153,8 +150,9 @@ What the first models showed (`02-Models.ipynb`, section 5):
   several years together can use the text to guess the era, which looks like big gains and losses that are really
   about the year. Every model now reports its error split into the level and the spread (how well it ranks
   companies within a year).
-* Within a year, the averaged FinBERT vectors add little, and not consistently: −6% to +10% by year, −0.6% to
-  +2.6% on average. By the rule above, the averaged vectors look like the weak point.
+* Within a year, the averaged FinBERT vectors add little: −6% to +7% by year, −1.0% to +0.3% on average, and in
+  11 of 72 fits the last training year chose to switch the text off. By the rule above, the averaged vectors look
+  like the weak point.
 * On Kogan et al.'s own full data and windows, a straight line on last year's volatility, with no text, scores
   0.1403 for 2006 against their text model's 0.1402. Much of the paper's gain comes from fitting history, not from
   the text.
@@ -165,7 +163,7 @@ Next steps (content freeze Monday 30 November, 12:00):
 
 | When | What | Who |
 |---|---|---|
-| Group | Agree: report against both copying and the line, with the line as the bar; one rule for tuning hyperparameters; whether the second FinBERT goes back in | all |
+| Group | Agree: report against both copying and the line, with the line as the bar; whether the second FinBERT goes back in | all |
 | 16–18 Nov | Attention network in `02-Models.ipynb`: the chunk vectors from `data.pkl`, attention pooling with the padding masked (Ilse et al., 2018), predicting the within-year residual over the line; dropout, early stopping on the last training year and 5 seeds, on a Colab GPU; paper and strict windows; plots of the attention weights | Alex |
 | 16–18 Nov | MLP, scored with `scoring.evaluate` against the within-year ridge | Louis |
 | 19–20 Nov | If attention is no better than the within-year ridge: embed Item 7 with Yang et al.'s FinBERT on Colab, timed on CPU and GPU across batch sizes (this doubles as the scaling experiment) | Alex, Oscar |
@@ -178,7 +176,6 @@ Next steps (content freeze Monday 30 November, 12:00):
 - Araci, D. (2019). FinBERT: Financial sentiment analysis with pre-trained language models. *arXiv:1908.10063*.
 - Diebold, F. X. & Mariano, R. S. (1995). Comparing predictive accuracy. *Journal of Business & Economic Statistics*, 13(3), 253–263.
 - Efron, B. & Tibshirani, R. J. (1993). *An Introduction to the Bootstrap*. Chapman & Hall.
-- Golub, G. H., Heath, M. & Wahba, G. (1979). Generalized cross-validation as a method for choosing a good ridge parameter. *Technometrics*, 21(2), 215–223.
 - Hastie, T., Tibshirani, R. & Friedman, J. (2009). *The Elements of Statistical Learning*, 2nd ed., §3.4 (shrinkage methods). Springer.
 - Ilse, M., Tomczak, J. M. & Welling, M. (2018). Attention-based deep multiple instance learning. *ICML 2018*.
 - Kogan, S., Levin, D., Routledge, B. R., Sagi, J. S. & Smith, N. A. (2009). Predicting risk from financial reports with regression. *NAACL-HLT 2009*, 272–280. https://aclanthology.org/N09-1031/
