@@ -6,7 +6,8 @@ start with and how a report goes into it. It ends with what we decided to build,
 
 Oscar has the data ready (`report/02-Data.ipynb`): 27,142 reports, each section turned into FinBERT chunk vectors,
 with the shared training and test years. Louis is starting on an MLP. My part is how every model is scored, the
-simplest text model (a linear one), and then the main model, the attention network.
+simplest text model (a linear one), and then the main model, the attention network. Where the course covers a
+method, we cite the lecture or workshop and the slide, and go to papers only for what it does not.
 
 ## 1. What the brief asks
 
@@ -28,8 +29,8 @@ For the models this means:
 We follow Kogan et al. (2009), who built the dataset:
 
 * **Target** - `logvol_after`, the log of the standard deviation of daily returns over the 12 months after filing.
-* **Score** - mean squared error (MSE) on a held-out year, for test years 2001–2006, each trained on the five
-  years before.
+* **Score** - mean squared error (MSE, the loss of lecture 02.1, slide 16) on a held-out year, for test years
+  2001–2006, each trained on the five years before.
 * **Their baseline** - simply copying last year's log volatility. Their only fitted model on last year's
   volatility alone (support vector regression) did worse than copying (Table 2: an MSE of 5.68 in 2006 with an
   intercept), so the paper has no working fitted history-only baseline.
@@ -46,8 +47,10 @@ throws away information and loses the comparison with the paper.
 
 A report's label covers the 12 months after filing, so a report filed in December 2005 has a label running into
 2006. In real use that label is not known yet when a 2006 report arrives, so training on it uses information from
-the future. Oscar therefore fixed two windows in `report/02` (saved in `data/output/splits.csv`), and every model
-in the project uses them:
+the future. This is the correlation-in-time problem of lecture 02.2 (slide 9): the fix there is to split the data
+in windows rather than at random, and to take the right unit as the "datapoint" - here a filing year, not a report.
+Oscar therefore fixed two windows in `report/02` (saved in `data/output/splits.csv`), and every model in the
+project uses them:
 
 | Window | Years for test year $T$ | Pros | Cons |
 |---|---|---|---|
@@ -55,20 +58,22 @@ in the project uses them:
 | strict | $T-5 \dots T-2$ | No overlap with the test year | One year less data |
 
 `report/02` also sets the rule for hyperparameters: they are tuned on the last training year, never on the test
-year. For the neural networks, that year is also the one used for early stopping.
+year. That is lecture 02.2's rule that held-out data can score a model but never influence it (slide 7); tuning
+on the test year is the "double dipping" of lecture 05.2 (slide 19). For the neural networks, that year is also
+the one used for early stopping.
 
 ## 4. Telling whether a difference is real
 
 Two models' MSEs on the same test year always differ a little by chance, so we need an interval on the
 difference. For test report $i$, let $d_i = (y_i - \hat y_i^{\text{model}})^2 - (y_i - \hat y_i^{\text{base}})^2$,
-so the difference in MSE is $\bar d$. A paired bootstrap resamples the test reports many times and recomputes
-$\bar d$ (Efron & Tibshirani, 1993). Both models are scored on the same resampled reports, so the noise from
-which reports happen to be in the test year cancels. This is the same idea as the Diebold–Mariano test for
-comparing forecasts (Diebold & Mariano, 1995).
+so the difference in MSE is $\bar d$. A paired bootstrap resamples the test reports with replacement many times
+and recomputes $\bar d$ (lecture 05.2, slide 14; Efron & Tibshirani, 1993). Both models are scored on the same
+resampled reports, so the noise from which reports happen to be in the test year cancels. This is the same idea
+as the Diebold–Mariano test for comparing forecasts (Diebold & Mariano, 1995).
 
-The bootstrap treats reports as independent, but reports in the same year share the market's shocks - in a crash
-year everyone's volatility rises together. So each interval is somewhat too narrow, and the stronger evidence is
-consistency across the six test years.
+The bootstrap assumes the reports are exchangeable (lecture 05.2, slide 15), but reports in the same year share
+the market's shocks - in a crash year everyone's volatility rises together. So each interval is somewhat too
+narrow, and the stronger evidence is consistency across the six test years.
 
 ## 5. A linear baseline for the neural networks
 
@@ -77,14 +82,21 @@ the averaged FinBERT vectors does as well as an MLP, the hidden layers added not
 neural network with no hidden layer, so it is the bottom rung of our ladder: ridge, then Louis's MLP, then the
 attention network.
 
-We use ridge regression. The inputs are 768 numbers per section (1,536 for both), heavily correlated with each
-other, so ordinary least squares would mostly fit noise. Lasso assumes only a few inputs matter, which does not
-suit FinBERT's dimensions, as none of them means anything on its own. Ridge keeps every input but shrinks them:
+We use ridge regression, which is not in the course, so we take it from Hastie, Tibshirani & Friedman (2009,
+§3.4). The inputs are 768 numbers per section (1,536 for both), heavily correlated with each other, so the least
+squares solution of lecture 02.1 (slide 18), $\hat\beta = (X^\top X)^{-1}X^\top y$, would mostly fit noise: the
+lecture's own optimism argument (slide 29) says the out-of-sample error grows with the number of predictors.
+Lasso assumes only a few inputs matter, which does not suit FinBERT's dimensions, as none of them means anything
+on its own. Ridge keeps every input but shrinks them:
 $$\hat\beta_\lambda = (X^\top X + \lambda I)^{-1} X^\top y, \qquad X\hat\beta_\lambda = \sum_j u_j \, \frac{d_j^2}{d_j^2 + \lambda} \, u_j^\top y,$$
-where $X = U D V^\top$. Directions with a lot of spread across reports are kept almost whole, and those with
-little spread, where the fit would chase noise, are shrunk towards zero (Hastie, Tibshirani & Friedman, 2009,
-§3.4.1). The inputs are standardised on the training rows, and $\lambda$ is chosen on the last training year
-(section 3): fit on the other years, score the last one, keep the best $\lambda$ and refit on the whole window.
+where $X = U D V^\top$. The $u_j$ are the principal components of lecture 04.1: directions with a lot of spread
+across reports are kept almost whole, and those with little spread, where the fit would chase noise, are shrunk
+towards zero (Hastie, Tibshirani & Friedman, 2009, §3.4.1). The inputs are standardised on the training rows.
+
+Portfolio 2.2.P gives a cheap way to choose $\lambda$ - leave-one-out from the hat matrix - but also says that
+leaving out one datapoint is not enough unless the data are independent, and reports in the same year are not. So
+$\lambda$ is chosen on the last training year (section 3): fit on the other years, score the last one, keep the
+best $\lambda$ and refit on the whole window.
 
 ## 6. How a report goes into the model
 
@@ -97,8 +109,9 @@ A report has a variable number of chunk vectors (median 32), and a linear model 
 | First chunk only | Cheapest | Ignores most of the report |
 | Learned weights (attention) | Can focus on the chunks about risk | Needs a neural network - our main model |
 
-Averaging is exactly the attention network with all weights equal, so comparing the two measures what learning
-the weights buys.
+Averaging and taking the maximum are the average- and max-pooling layers of lecture 06.2 (slide 12), applied to
+chunks instead of pixels. Averaging is exactly the attention network with all weights equal, so comparing the two
+measures what learning the weights buys.
 
 Last year's volatility goes in through two stages rather than as one more input to the ridge:
 
@@ -168,7 +181,7 @@ Next steps (content freeze Monday 30 November, 12:00):
 | 16–18 Nov | MLP, scored with `scoring.evaluate` against the within-year ridge | Louis |
 | 19–20 Nov | If attention is no better than the within-year ridge: embed Item 7 with Yang et al.'s FinBERT on Colab, timed on CPU and GPU across batch sizes (this doubles as the scaling experiment) | Alex, Oscar |
 | Optional | Embed Kogan's own Item 7 for the ~2,000 dropped reports, so Item 7 models can be scored on the paper's full test sets | Oscar |
-| 23–27 Nov | Scaling write-up: map/reduce for FinBERT and for the per-year ridge sums, with the timings | Alex, Oscar |
+| 23–27 Nov | Scaling write-up: map/reduce (lecture 09.2) for FinBERT and for the per-year ridge sums, with the timings | Alex, Oscar |
 | By 30 Nov | Models notebook into `report/03-Models.ipynb`; every notebook rerun top to bottom with outputs | all |
 
 ## References
@@ -181,3 +194,13 @@ Next steps (content freeze Monday 30 November, 12:00):
 - Kogan, S., Levin, D., Routledge, B. R., Sagi, J. S. & Smith, N. A. (2009). Predicting risk from financial reports with regression. *NAACL-HLT 2009*, 272–280. https://aclanthology.org/N09-1031/
 - Xia, B., Rawte, V. D., Zaki, M. J. & Gupta, A. (2022). FETILDA: An effective framework for fin-tuned embeddings for long financial text documents. *arXiv:2206.06952*.
 - Yang, Y., Uy, M. C. S. & Huang, A. (2020). FinBERT: A pretrained language model for financial communications. *arXiv:2006.08097*.
+
+Course material (Data Science Toolbox, University of Bristol, 2026):
+
+- Lecture 02.1, Towards Modern Regression. https://dsbristol.github.io/dst/assets/slides/02.1-ModernRegression.pdf
+- Lecture 02.2, Cross Validation. https://dsbristol.github.io/dst/assets/slides/02.2-CrossValidation.pdf
+- Portfolio 2.2.P, Leave-one-out Cross Validation. https://dsbristol.github.io/dst/assets/slides/02.2.1-PortfolioCV.pdf
+- Lecture 04.1, Latent Structures and PCA. https://dsbristol.github.io/dst/assets/slides/04.1-LatentStructuresPCA.pdf
+- Lecture 05.2, Towards Modern Statistical Testing. https://dsbristol.github.io/dst/assets/slides/05.2-StatisticalTesting.pdf
+- Lecture 06.2, Neural Networks Lecture 2 (CNNs and Transformers). https://dsbristol.github.io/dst/assets/slides/06.2-Neural%20Networks%20Lecture%202.pdf
+- Lecture 09.2, Mapping, Reducing, and Computational Graphs. https://dsbristol.github.io/dst/assets/slides/09.2-ComputationalGraphs.pdf
