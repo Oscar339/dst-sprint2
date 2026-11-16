@@ -73,36 +73,21 @@ The bootstrap treats reports as independent, but reports in the same year share 
 year everyone's volatility rises together. So each interval is somewhat too narrow, and the stronger evidence is
 consistency across the six test years.
 
-## 5. The first text model: which linear model?
+## 5. A linear baseline for the neural networks
 
-A linear model is the cheapest test of whether FinBERT's vectors carry any information about future risk, and it
-is the bar for the neural networks: if a linear model on the same inputs does as well as an MLP, the network
-added nothing. The input is 768 numbers per section (1,536 for both), heavily correlated with each other, and the
-last-year window has only about 2,500 training reports.
+The project is about neural networks, but they need a bar to beat that uses the same inputs. If a linear model on
+the averaged FinBERT vectors does as well as an MLP, the hidden layers added nothing. A linear model is also a
+neural network with no hidden layer, so it is the bottom rung of our ladder: ridge, then Louis's MLP, then the
+attention network.
 
-| Model | Loss + penalty | Pros | Cons |
-|---|---|---|---|
-| Ordinary least squares | squared error | Simplest | With up to 1,536 correlated inputs, $X^\top X$ is close to singular and the coefficients are mostly noise |
-| **Ridge** | squared error + $\lambda \lVert\beta\rVert_2^2$ | Keeps every input but shrinks them; closed-form solution; one hyperparameter, cheap to choose | All inputs kept, so not sparse |
-| Lasso | squared error + $\lambda \lVert\beta\rVert_1$ | Picks out a few inputs | Assumes a few inputs matter, but FinBERT's dimensions have no individual meaning |
-| Linear SVR | $\varepsilon$-insensitive + $\lambda \lVert\beta\rVert_2^2$ | What Kogan et al. used | Same penalty as ridge, no closed form; kept for the word-count reproduction |
-| Principal components regression | squared error on the top $k$ components | Removes the correlation | Have to choose $k$; ridge does the same thing smoothly |
-
-We chose ridge. It chooses
-$$\hat\beta_\lambda = \arg\min_\beta \lVert y - X\beta\rVert^2 + \lambda\lVert\beta\rVert^2 = (X^\top X + \lambda I)^{-1} X^\top y,$$
-and adding $\lambda I$ makes the matrix invertible however correlated the inputs are. Writing $X = U D V^\top$
-shows what the penalty does (Hastie, Tibshirani & Friedman, 2009, §3.4.1):
-$$X\hat\beta_\lambda = \sum_j u_j \, \frac{d_j^2}{d_j^2 + \lambda} \, u_j^\top y .$$
-Directions with a lot of spread across reports ($d_j$ large) are kept almost whole, and directions with little
-spread, where the fit would mostly chase noise, are shrunk towards zero. Principal components regression keeps the
-top $k$ directions whole and drops the rest, so ridge is the smooth version of it.
-
-Two practical points:
-
-* The inputs are standardised on the training rows, as the penalty treats every coefficient the same.
-* $\lambda$ is chosen by generalised cross-validation (GCV; Golub, Heath & Wahba, 1979), a closed-form
-  approximation to leave-one-out that needs only the eigenvalues of $X^\top X$. `report/02` proposes tuning on
-  the last training year instead, but the last-year window has only one year, so we use GCV in every window.
+We use ridge regression. The inputs are 768 numbers per section (1,536 for both), heavily correlated with each
+other, so ordinary least squares would mostly fit noise. Lasso assumes only a few inputs matter, which does not
+suit FinBERT's dimensions, as none of them means anything on its own. Ridge keeps every input but shrinks them:
+$$\hat\beta_\lambda = (X^\top X + \lambda I)^{-1} X^\top y, \qquad X\hat\beta_\lambda = \sum_j u_j \, \frac{d_j^2}{d_j^2 + \lambda} \, u_j^\top y,$$
+where $X = U D V^\top$. Directions with a lot of spread across reports are kept almost whole, and those with
+little spread, where the fit would chase noise, are shrunk towards zero (Hastie, Tibshirani & Friedman, 2009,
+§3.4.1). The inputs are standardised on the training rows, and $\lambda$ is chosen by generalised
+cross-validation (GCV; Golub, Heath & Wahba, 1979), which works in every window, including the one-year one.
 
 ## 6. How a report goes into the model
 
@@ -124,10 +109,8 @@ Last year's volatility goes in through two stages rather than as one more input 
 2. fit ridge on the text to the residual $y - \hat y^{\text{line}}$, the part of next year's volatility that last
    year's does not explain.
 
-This way the baseline coefficient is not penalised, and as $\lambda \to \infty$ the model becomes exactly the
-baseline, so "ridge against the line" measures what the text adds. The residual is also the project's question.
-We fit three versions - Item 1 only, Item 7 only and both - for a first answer on which section carries the risk
-information.
+This way the baseline coefficient is not penalised, and "ridge against the line" measures what the text adds. We
+fit Item 1 only, Item 7 only and both.
 
 One weakness to watch is the encoder. The vectors are the CLS vector of `ProsusAI/finbert`, which was further
 trained to label financial sentences as positive, negative or neutral (Araci, 2019), so it may mostly encode tone.
@@ -145,7 +128,7 @@ fine-tuning FinBERT beat keeping it frozen by about 5% on volatility.
 | Baselines | Copy last year, and a straight line fitted on it | Copying is the paper's baseline; the line uses last year's volatility as well as a one-number rule can, so it is the bar the text has to clear |
 | Training windows | paper, strict, last year, all prior | Comparable with the paper, no look-ahead, and a learning curve (section 3) |
 | Uncertainty | Paired bootstrap per test year, and consistency across years | Section 4 |
-| First text model | Ridge on the averaged chunk vectors, fitted to the line's residual | Section 5 and 6 |
+| Linear baseline for the networks | Ridge on the averaged chunk vectors, fitted to the line's residual | Sections 5 and 6 |
 | Inputs | Item 1, Item 7 and both | Which section carries the risk information |
 | Choosing $\lambda$ | GCV in every window | Works for the one-year window too |
 | Shared code | `scoring.py`: every model is a function `predict(df, train, test)` | So Louis's MLP and the attention network are scored exactly the same way |
@@ -164,7 +147,7 @@ results = scoring.evaluate(df, predict, name="MLP")
 
 ## 8. Updated plan (14 November), after the linear models
 
-What the first models showed (`02-Models.ipynb`, section 10):
+What the first models showed (`02-Models.ipynb`, section 5):
 
 * Most of the error is the year's overall volatility level, which no single report can know. A model fitted on
   several years together can use the text to guess the era, which looks like big gains and losses that are really
