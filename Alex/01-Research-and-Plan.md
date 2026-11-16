@@ -2,7 +2,7 @@
 
 In this section, we look at what the brief asks of our models, how to score them fairly, which linear model to
 start with and how a report goes into it. It ends with what we decided to build, which is carried out in
-`02-Models.ipynb`, and an updated plan from what the first models showed.
+`02-Linear-models.ipynb`, and an updated plan from what the first models showed.
 
 Oscar has the data ready (`report/02-Data.ipynb`): 27,142 reports, each section turned into FinBERT chunk vectors,
 with the shared training and test years. Louis is starting on an MLP. My part is how every model is scored, the
@@ -144,7 +144,7 @@ results = scoring.evaluate(df, predict, name="MLP")
 
 ## 8. Updated plan (14 November), after the linear models
 
-What the first models showed (`02-Models.ipynb`, section 5):
+What the linear models showed (`02-Linear-models.ipynb`, section 5):
 
 * Most of the error is the year's overall volatility level, which no single report can know. A model fitted on
   several years together can use the text to guess the era, which looks like big gains and losses that are really
@@ -164,7 +164,7 @@ Next steps (content freeze Monday 30 November, 12:00):
 | When | What | Who |
 |---|---|---|
 | Group | Agree: report against both copying and the line, with the line as the bar; whether the second FinBERT goes back in | all |
-| 16–18 Nov | Attention network in `02-Models.ipynb`: the chunk vectors from `data.pkl`, attention pooling with the padding masked (Ilse et al., 2018), predicting the within-year residual over the line; dropout, early stopping on the last training year and 5 seeds, on a Colab GPU; paper and strict windows; plots of the attention weights | Alex |
+| 16–18 Nov | Attention network in `03-Attention-network.ipynb`: the chunk vectors from `data.pkl`, attention pooling with the padding masked (Ilse et al., 2018), predicting the within-year residual over the line; dropout, early stopping on the last training year and 5 seeds, on a Colab GPU; paper and strict windows; plots of the attention weights | Alex |
 | 16–18 Nov | MLP, scored with `scoring.evaluate` against the within-year ridge | Louis |
 | 19–20 Nov | If attention is no better than the within-year ridge: embed Item 7 with Yang et al.'s FinBERT on Colab, timed on CPU and GPU across batch sizes (this doubles as the scaling experiment) | Alex, Oscar |
 | Optional | Embed Kogan's own Item 7 for the ~2,000 dropped reports, so Item 7 models can be scored on the paper's full test sets | Oscar |
