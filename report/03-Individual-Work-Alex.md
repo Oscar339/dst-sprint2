@@ -1,18 +1,16 @@
 # Individual work - Alex
 
-My part of the project was how every model is scored, the linear baseline that the neural networks have to beat,
-and the attention network, followed by a test of a second encoder. The full working is in `Alex/`: the research and
-plan (`01-Research-and-Plan.md`), the linear models (`02-Linear-models.ipynb`), the attention network
-(`03-Attention-network.ipynb`) and the second encoder (`04-Second-encoder.ipynb`). The shared code is `Alex/scoring.py`,
-`ridge_sums.py` and `attention.py`. Everything uses Oscar's data (`data.pkl`), his test years (2001 to 2006) and his
-two training windows, and anything tuned is tuned on the last training year, never on the test year (lecture 02.2).
+In this project, I built the scoring metrics for the models, including a linear (Ridge) baseline that the neural networks
+have to beat to be proven effective. I then built an attention model and tested a second encoder. To see all of my full workings, 
+please head to `Alex/` where all my research, planning and modelling is. 
 
-## 1. Scoring every model the same way
+## 1. Scoring
 
-`scoring.py` scores any model written as `predict(df, train, test)` on every test year and window, so Louis's MLP
-and my models are compared on exactly the same reports. Each model is compared with two baselines: copying last
-year's volatility (Kogan et al.'s baseline) and a straight line fitted on it, and the difference in MSE gets a paired
-bootstrap interval over the test reports (lecture 05.2).
+Firstly, I built two things for each neural network ot be compared. As we can compare the actual accuracy of 
+each model on the given volatility for the test year, the benchmark is going to be against other models, in particular
+we want to see whether a neural network can do better than a simple linear model. So, each model is compared with two baselines. 
+The first is copying last year's volatility (Kogan et al.'s baseline) and the second is a straight line fitted on it, 
+and the difference in MSE gets a paired bootstrap interval over the test reports (as seen in lecture 05.2).
 
 The most useful thing it does is split each test year's MSE into two parts, $\text{MSE} = \bar e^{\,2} +
 \tfrac1n\sum_i (e_i - \bar e)^2$: the **level**, how far off the model is about the whole year's volatility, which
