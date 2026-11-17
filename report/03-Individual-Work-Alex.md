@@ -13,8 +13,8 @@ The first is copying last year's volatility (Kogan et al.'s baseline), and the s
 and the difference in MSE gets a paired bootstrap interval over the test reports (as seen in lecture 05.2).
 
 The most useful thing it does is split each test year's MSE into two parts, $\text{MSE} = \bar e^{2} +
-\tfrac1n\sum_i (e_i - \bar e)^2$: the level, how far off the model is from the whole year's volatility, which
-no single report can know, and the **spread**, how well it ranks the companies within the year, which is what the
+\tfrac1n\sum_i (e_i - \bar e)^2$. We look at the level, how far off the model is from the whole year's volatility, which
+no single report can know, and the spread, how well the model ranks the companies within the year, which is what the
 text could help with. For the straight line, the level is 44% of the MSE in 2003 and 30% in 2001, so a model can look
 much better or worse than it is just by getting the year right or wrong.
 
