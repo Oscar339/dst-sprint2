@@ -6,10 +6,10 @@ please head to `Alex/` where all my research, planning and modelling is.
 
 ## 1. Scoring
 
-Firstly, I built two things for each neural network ot be compared. As we can compare the actual accuracy of 
-each model on the given volatility for the test year, the benchmark is going to be against other models, in particular
+Firstly, I built two things for each neural network to be compared against. As we can score the actual accuracy of 
+each model on the given volatility for the test year, the benchmark is going to be against other models; in particular
 we want to see whether a neural network can do better than a simple linear model. So, each model is compared with two baselines. 
-The first is copying last year's volatility (Kogan et al.'s baseline) and the second is a straight line fitted on it, 
+The first is copying last year's volatility (Kogan et al.'s baseline), and the second is a straight line fitted on it, 
 and the difference in MSE gets a paired bootstrap interval over the test reports (as seen in lecture 05.2).
 
 The most useful thing it does is split each test year's MSE into two parts, $\text{MSE} = \bar e^{\,2} +
