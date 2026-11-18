@@ -65,28 +65,40 @@ Measured against copying last year, as FETILDA measured, the network wins in fou
 does the straight line with no text, by almost the same amounts. Our comparison separates the two, which the papers'
 comparisons do not.
 
-## 4. The second encoder (in progress)
+## 4. The second encoder
 
 By the decision rule in the plan, the evidence now points at the vectors rather than at how they are combined. Our
 vectors come from `ProsusAI/finbert`, which was tuned for sentence sentiment. Notebook 04 reads Item 7 again with Yang
 et al.'s FinBERT, pre-trained on 10-Ks and analyst reports, keeping both the CLS and the token-average vector of each
-chunk, and reruns the same ridge and attention network on them, changing nothing else. It is built and checked, and
-runs on Colab once Oscar shares the Item 7 text.
+chunk, and reruns the same ridge and attention network on them, changing nothing else.
+
+* **With ridge, the encoder makes no difference.** −1.08% on Yang's CLS vectors against −1.02% on ProsusAI's (paper
+  window), with the same pattern by year.
+* **The attention network does slightly worse on Yang's vectors** (−0.03% against −1.02%). All five seeds on Yang's
+  vectors are worse than all five on ProsusAI's, mostly because of 2004, and the network overfits sooner.
+* **CLS or average does not matter,** even though the two vectors differ (median cosine similarity 0.86).
+
+So the encoder was not what held the models back either.
 
 ## 5. Scaling
 
 Three parts of my work bear on the 1000× question. The per-year sums make ridge's cost after one pass independent of
 the number of reports. The 240 training runs are independent of each other, so they are embarrassingly parallel
 (lecture 09.1); within a run the epochs are sequential, which is the part Amdahl's law says more hardware cannot
-remove (lecture 09.2). And embedding every chunk with FinBERT is the expensive step, but every chunk is independent,
-so it splits across as many GPUs as are available; notebook 04 times it at five batch sizes.
+remove (lecture 09.2). And embedding every chunk with FinBERT is the expensive step: 480,332 chunks took 68 minutes
+on one T4. The GPU was already fully used at batch size 8 (about 150 chunks a second at every batch size), and the
+full run was a quarter slower than that because the GPU waited while the CPU read and tokenised text, a serial step
+that should overlap with the embedding. At 1000× this is about 1,100 T4-hours, but every chunk is independent, so it
+splits across GPUs: about half a day on 100.
 
 ## 6. What I take from it
 
 Every model I built agrees: once last year's volatility is used properly and the year's level is taken out, the
 FinBERT text adds little, and a neural network adds nothing over a linear model on the same vectors. That is a
-negative result, but a careful one, and it changes how the published results read. The second encoder tests the one
-explanation that is left.
+negative result, but a careful one, and it changes how the published results read. A second encoder trained on
+the same kind of documents gives the same answer, so it is not down to the choice of BERT. The one option left is
+fine-tuning the encoder on the target, which, with the networks already overfitting in two or three epochs, is more
+likely to overfit than to help.
 
 ## References
 
