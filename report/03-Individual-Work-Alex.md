@@ -20,11 +20,9 @@ much better or worse than it is just by getting the year right or wrong.
 
 ## 2. The linear baseline
 
-I fitted a ridge regression on each report's averaged FinBERT vectors. It is built on top of a straight line, which is an ordinary least-squares fit of next year's volatility on last year's volatility, with no text. The ridge only predicts what this line gets wrong, so any improvement over the line comes from the text. A ridge modle is the simplest model that uses the text, and it is the same as a neural network with no hidden layer, so the attention network and Louis's MLP have to beat it to show that their hidden layers help.
+I fitted a ridge regression on each report's averaged FinBERT vectors. It is built on top of a straight line, which is an ordinary least-squares fit of next year's volatility on last year's volatility, with no text. The ridge only predicts what this line gets wrong, so any improvement over the line comes from the text. A ridge model is the simplest model that uses the text, and it is the same as a neural network with no hidden layer, so the attention network and Louis's MLP have to beat it to show that their hidden layers help. This is what we found out:
 
-* **Fitting all years together was a dead end.** The ridge model swung from 26% better than the straight line to 16% worse depending
-  on the year, and its biggest gain (2003) was almost all level: the text was being used to guess which era a report
-  is from. So the final version only lets the text explain differences between companies in the same year.
+* . **Fitting all years together was a dead end.** The ridge model swung from 26% better than the straight line to 16% worse depending on the year. This shows that it was mostly using the text to guess which era a report came from, and so how volatile the whole market would be that year, rather than which companies would be more volatile than others. Its biggest gain, in 2003, was almost all in the level part of the error, which no single report can know. So the final version only lets the text explain differences between companies in the same year.
 * **Within a year, the text adds little.** The within-year ridge changes the MSE by −1.0% to +0.3% on average
   against the line, helping in 2001 and 2002 and hurting in 2004. In 11 of 72 fits the last training year chose to
   switch the text off.
