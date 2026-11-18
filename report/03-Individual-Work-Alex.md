@@ -20,11 +20,9 @@ much better or worse than it is just by getting the year right or wrong.
 
 ## 2. The linear baseline
 
-A ridge regression on each report's averaged FinBERT vectors, fitted to what the straight line gets wrong, is the
-simplest text model, and a neural network with no hidden layer, so the networks have to beat it to show their hidden
-layers help.
+I fitted a ridge regression on each report's averaged FinBERT vectors. It is built on top of a straight line, which is an ordinary least-squares fit of next year's volatility on last year's volatility, with no text. The ridge only predicts what this line gets wrong, so any improvement over the line comes from the text. A ridge modle is the simplest model that uses the text, and it is the same as a neural network with no hidden layer, so the attention network and Louis's MLP have to beat it to show that their hidden layers help.
 
-* **Fitting all years together was a dead end.** Ridge swung from 26% better than the line to 16% worse depending
+* **Fitting all years together was a dead end.** The ridge model swung from 26% better than the straight line to 16% worse depending
   on the year, and its biggest gain (2003) was almost all level: the text was being used to guess which era a report
   is from. So the final version only lets the text explain differences between companies in the same year.
 * **Within a year, the text adds little.** The within-year ridge changes the MSE by −1.0% to +0.3% on average
@@ -39,19 +37,19 @@ straight line with no text scores 0.1403 for 2006 against 0.1402 for their best 
 copying comes from fitting last year's volatility, not from the text. I also found that the 11% of reports our data
 could not match to EDGAR-CORPUS are the hard ones, with 3 to 6 times the error of copying, so our MSEs are lower than
 the paper's for reasons that have nothing to do with any model. FETILDA's reported 27% gain over Kogan's baseline is
-measured on a different subset of reports, so it may partly be the same effect.
+measured on a different subset of reports, so this could be a similar thing happening.
 
 ## 3. The attention network
 
 The main model reads each report as a bag of chunk vectors, learns a weight for each chunk with attention pooling
-(Ilse et al., 2018) and predicts the within-year residual. The pieces come from the course where they can: a softmax
+(Ilse et al., 2018) and predicts the within-year residual. I follow on from the course as much as possible. I use a softmax
 over chunk scores, ReLU and tanh layers, and the training loop of workshop 06.3 (lectures 06.1 and 06.2). Early
-stopping, dropout and AdamW come from the literature. Before training I checked that the weights sum to one, that
+stopping, dropout and AdamW come from the literature. Before training, I checked that the weights sum to one, that
 padding gets no weight, that shuffling the chunks does not change the prediction, and that the network can overfit
 32 reports.
 
 It was trained on a Colab T4: 4 variants (attention on Item 7, Item 1 and both; mean pooling on Item 7) × 5 seeds ×
-2 windows × 6 test years, 240 runs in 1.2 GPU-hours, saved to Google Drive so a dropped session could resume.
+2 windows × 6 test years, 240 runs in 1.2 GPU-hours, saved to Google Drive.
 
 * **It does no better than the within-year ridge.** On Item 7, both change the MSE by −1.0% on average on the paper
   window, with the same pattern by year.
