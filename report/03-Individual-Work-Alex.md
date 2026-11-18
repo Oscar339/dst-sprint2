@@ -24,10 +24,8 @@ I fitted a ridge regression on each report's averaged FinBERT vectors. It is bui
 
 * **Fitting all years together was a dead end.** The ridge model swung from 26% better than the straight line to 16% worse depending on the year. This shows that it was mostly using the text to guess which era a report came from, and so how volatile the whole market would be that year, rather than which companies would be more volatile than others. Its biggest gain, in 2003, was almost all in the level part of the error, which no single report can know. So the final version only lets the text explain differences between companies in the same year.
 * **Within a year, the text adds little.** The within-year ridge changes the MSE by −1.0% to +0.3% on average
-  against the line, helping in 2001 and 2002 and hurting in 2004. In either case, this was not a massively significant impact in performance. In 11 of 72 fits the last training year chose to switch the text off.
-* **It is fitted from per-year sums.** Ridge only needs sums such as $X^\top X$ over the training reports, so they
-  are computed once per year and added up for any window: the map/reduce of lecture 09.2. Each fit then costs the
-  same however many reports there are, and the notebook went from 45 minutes to 3.
+  against the line, helping in 2001 and 2002 and hurting in 2004. In either case, this was not a massively significant impact on performance. In 11 out of 72 fits, the last training year chose to switch the text off.
+* **Ridge only needs a few totals from the data, not every report.** To fit the model, all the ridge needs is a couple of sums over the training reports, such as $X^\top X$ and $X^\top y$. So, I worked these out once for each year and then added up the years each training window covers, which is the map/reduce idea from lecture 09.2. This means that after one pass over the data, each fit takes the same time however many reports there are, and each year could be worked out on a separate machine. In practice, this took the notebook from 45 minutes to 3.
 
 Comparing with the paper gave the result I found most interesting. On Kogan et al.'s own full data and windows, the
 straight line with no text scores 0.1403 for 2006 against 0.1402 for their best text model, so most of their gain over
