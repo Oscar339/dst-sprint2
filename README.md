@@ -52,6 +52,10 @@ _To be filled in as the report is written._
 3. `03-Individual-Work-Alex.md` (Alex) — the shared scoring, the linear
    baseline, the attention network and the second encoder; the working is in
    `Alex/`.
+4. `04-Scaling.ipynb` (Oscar, with Alex's Colab T4 timings) — FinBERT's speed
+   on CPU, laptop GPU and T4, the full runs against the speed tests, and what
+   1000× more data would take. Redraws from the saved timings in
+   `data/output/scaling-*.csv`; set `MEASURE = True` to re-time.
 
 ### Requirements
 

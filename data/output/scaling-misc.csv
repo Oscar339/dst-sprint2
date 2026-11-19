@@ -1,0 +1,5 @@
+name,value
+tokeniser_chunks_per_s,1982.303656709879
+text_bytes_per_chunk,2567.3543809861653
+tokens_per_chunk,496.6505853139411
+model_load_s,1.3327766660004272
