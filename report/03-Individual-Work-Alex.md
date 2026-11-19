@@ -6,11 +6,9 @@ please head to `Alex/` where all my research, planning and modelling is.
 
 ## 1. Scoring
 
-Firstly, I built two things for each neural network to be compared against. As we can score the actual accuracy of 
-each model on the given volatility for the test year, the benchmark is going to be against other models; in particular
-we want to see whether a neural network can do better than a simple linear model. So, each model is compared with two baselines. 
-The first is copying last year's volatility (Kogan et al.'s baseline), and the second is a straight line fitted on it, 
-and the difference in MSE gets a paired bootstrap interval over the test reports (as seen in lecture 05.2).
+For each test year (2001 to 2006), every model predicts the volatility of each company's shares over the 12 months after its report, using only earlier years to train. Each prediction is then checked against the volatility that actually happened, and scored by the mean squared error (MSE) on log volatility, as Kogan et al. did.
+
+Then, I built two baselines for each model to be compared against, neither of which uses the text at all. A mean squared error on its own does not say whether a model is any good, so each model is scored against these on the same test reports. The first is simply copying last year's volatility, which is the baseline Kogan et al. used. The second is a straight line fitted to predict next year's volatility from last year's. This is the stronger of the two, so it is the main comparison: if a model beats it, the gain must come from the text. To check whether a difference in MSE is real rather than chance, I used a paired bootstrap over the test reports (lecture 05.2), which gives a 95% interval for the difference.
 
 The most useful thing this section does is split each test year's MSE into two parts, $\text{MSE} = \bar e^{2} +
 \tfrac1n\sum_i (e_i - \bar e)^2$. We look at the level, how far off the model is from the whole year's volatility, which
