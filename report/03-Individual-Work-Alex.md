@@ -6,11 +6,9 @@ please head to `Alex/` where all my research, planning and modelling is.
 
 ## 1. Scoring
 
-Firstly, I built two things for each neural network to be compared against. As we can score the actual accuracy of 
-each model on the given volatility for the test year, the benchmark is going to be against other models; in particular
-we want to see whether a neural network can do better than a simple linear model. So, each model is compared with two baselines. 
-The first is copying last year's volatility (Kogan et al.'s baseline), and the second is a straight line fitted on it, 
-and the difference in MSE gets a paired bootstrap interval over the test reports (as seen in lecture 05.2).
+For each test year (2001 to 2006), every model predicts the volatility of each company's shares over the 12 months after its report, using only earlier years to train. Each prediction is then checked against the volatility that actually happened, and scored by the mean squared error (MSE) on log volatility, as Kogan et al. did.
+
+Then, I built two baselines for each model to be compared against, neither of which uses the text at all. A mean squared error on its own does not say whether a model is any good, so each model is scored against these on the same test reports. The first is simply copying last year's volatility, which is the baseline Kogan et al. used. The second is a straight line fitted to predict next year's volatility from last year's. This is the stronger of the two, so it is the main comparison: if a model beats it, the gain must come from the text. To check whether a difference in MSE is real rather than chance, I used a paired bootstrap over the test reports (lecture 05.2), which gives a 95% interval for the difference.
 
 The most useful thing this section does is split each test year's MSE into two parts, $\text{MSE} = \bar e^{2} +
 \tfrac1n\sum_i (e_i - \bar e)^2$. We look at the level, how far off the model is from the whole year's volatility, which
@@ -20,38 +18,27 @@ much better or worse than it is just by getting the year right or wrong.
 
 ## 2. The linear baseline
 
-A ridge regression on each report's averaged FinBERT vectors, fitted to what the straight line gets wrong, is the
-simplest text model, and a neural network with no hidden layer, so the networks have to beat it to show their hidden
-layers help.
+I fitted a ridge regression on each report's averaged FinBERT vectors. It is built on top of a straight line, which is an ordinary least-squares fit of next year's volatility on last year's volatility, with no text. The ridge only predicts what this line gets wrong, so any improvement over the line comes from the text. A ridge model is the simplest model that uses the text, and it is the same as a neural network with no hidden layer, so the attention network and Louis's MLP have to beat it to show that their hidden layers help. This is what we found out:
 
-* **Fitting all years together was a dead end.** Ridge swung from 26% better than the line to 16% worse depending
-  on the year, and its biggest gain (2003) was almost all level: the text was being used to guess which era a report
-  is from. So the final version only lets the text explain differences between companies in the same year.
+* **Fitting all years together was a dead end.** The ridge model swung from 26% better than the straight line to 16% worse depending on the year. This shows that it was mostly using the text to guess which era a report came from, and so how volatile the whole market would be that year, rather than which companies would be more volatile than others. Its biggest gain, in 2003, was almost all in the level part of the error, which no single report can know. So the final version only lets the text explain differences between companies in the same year.
 * **Within a year, the text adds little.** The within-year ridge changes the MSE by −1.0% to +0.3% on average
-  against the line, helping in 2001 and 2002 and hurting in 2004. In 11 of 72 fits the last training year chose to
-  switch the text off.
-* **It is fitted from per-year sums.** Ridge only needs sums such as $X^\top X$ over the training reports, so they
-  are computed once per year and added up for any window: the map/reduce of lecture 09.2. Each fit then costs the
-  same however many reports there are, and the notebook went from 45 minutes to 3.
+  against the line, helping in 2001 and 2002 and hurting in 2004. In either case, this was not a massively significant impact on performance. In 11 out of 72 fits, the last training year chose to switch the text off.
+* **Ridge only needs a few totals from the data, not every report.** To fit the model, all the ridge needs is a couple of sums over the training reports, such as $X^\top X$ and $X^\top y$. So, I worked these out once for each year and then added up the years each training window covers, which is the map/reduce idea from lecture 09.2. This means that after one pass over the data, each fit takes the same time, however many reports there are, and each year could be worked out on a separate machine. In practice, this took the notebook from 45 minutes to 3.
 
 Comparing with the paper gave the result I found most interesting. On Kogan et al.'s own full data and windows, the
-straight line with no text scores 0.1403 for 2006 against 0.1402 for their best text model, so most of their gain over
-copying comes from fitting last year's volatility, not from the text. I also found that the 11% of reports our data
-could not match to EDGAR-CORPUS are the hard ones, with 3 to 6 times the error of copying, so our MSEs are lower than
-the paper's for reasons that have nothing to do with any model. FETILDA's reported 27% gain over Kogan's baseline is
-measured on a different subset of reports, so it may partly be the same effect.
+straight line with no text scores 0.1403 for 2006 against 0.1402 for their best text model. This suggests that the data in the text may not help much. I also found that the 11% of reports our data could not match to EDGAR-CORPUS are the hard ones, with 3 to 6 times the error of copying, so our MSEs are lower than the paper's for reasons that have nothing to do with any model. FETILDA's reported 27% gain over Kogan's baseline is measured on a different subset of reports, so this could be a similar thing happening.
 
 ## 3. The attention network
 
 The main model reads each report as a bag of chunk vectors, learns a weight for each chunk with attention pooling
-(Ilse et al., 2018) and predicts the within-year residual. The pieces come from the course where they can: a softmax
+(Ilse et al., 2018) and predicts the within-year residual. I follow on from the course as much as possible. I use a softmax
 over chunk scores, ReLU and tanh layers, and the training loop of workshop 06.3 (lectures 06.1 and 06.2). Early
-stopping, dropout and AdamW come from the literature. Before training I checked that the weights sum to one, that
+stopping, dropout and AdamW come from the literature. Before training, I checked that the weights sum to one, that
 padding gets no weight, that shuffling the chunks does not change the prediction, and that the network can overfit
 32 reports.
 
 It was trained on a Colab T4: 4 variants (attention on Item 7, Item 1 and both; mean pooling on Item 7) × 5 seeds ×
-2 windows × 6 test years, 240 runs in 1.2 GPU-hours, saved to Google Drive so a dropped session could resume.
+2 windows × 6 test years, 240 runs in 1.2 GPU-hours, saved to Google Drive.
 
 * **It does no better than the within-year ridge.** On Item 7, both change the MSE by −1.0% on average on the paper
   window, with the same pattern by year.
@@ -65,28 +52,40 @@ Measured against copying last year, as FETILDA measured, the network wins in fou
 does the straight line with no text, by almost the same amounts. Our comparison separates the two, which the papers'
 comparisons do not.
 
-## 4. The second encoder (in progress)
+## 4. The second encoder
 
-By the decision rule in the plan, the evidence now points at the vectors rather than at how they are combined. Our
-vectors come from `ProsusAI/finbert`, which was tuned for sentence sentiment. Notebook 04 reads Item 7 again with Yang
+After seeing the result from the initial attention model, I thought that the vectors may be holding the model back. Our
+vectors come from `ProsusAI/finbert`, which was tuned for sentence sentiment. We then read Item 7 again with Yang
 et al.'s FinBERT, pre-trained on 10-Ks and analyst reports, keeping both the CLS and the token-average vector of each
-chunk, and reruns the same ridge and attention network on them, changing nothing else. It is built and checked, and
-runs on Colab once Oscar shares the Item 7 text.
+chunk, and reruns the same ridge and attention network on them, changing nothing else.
+
+* **With ridge, the encoder makes no difference.** −1.08% on Yang's CLS vectors against −1.02% on ProsusAI's (paper
+  window), with the same pattern by year.
+* **The attention network does slightly worse on Yang's vectors** (−0.03% against −1.02%). All five seeds on Yang's
+  vectors are worse than all five on ProsusAI's, mostly because of 2004, and the network overfits sooner.
+* **CLS or average does not matter,** even though the two vectors differ (median cosine similarity 0.86).
+
+So the encoder was not what held the models back either.
 
 ## 5. Scaling
 
 Three parts of my work bear on the 1000× question. The per-year sums make ridge's cost after one pass independent of
 the number of reports. The 240 training runs are independent of each other, so they are embarrassingly parallel
 (lecture 09.1); within a run the epochs are sequential, which is the part Amdahl's law says more hardware cannot
-remove (lecture 09.2). And embedding every chunk with FinBERT is the expensive step, but every chunk is independent,
-so it splits across as many GPUs as are available; notebook 04 times it at five batch sizes.
+remove (lecture 09.2). And embedding every chunk with FinBERT is the expensive step: 480,332 chunks took 68 minutes
+on one T4. The GPU was already fully used at batch size 8 (about 150 chunks a second at every batch size), and the
+full run was a quarter slower than that because the GPU waited while the CPU read and tokenised text, a serial step
+that should overlap with the embedding. At 1000× this is about 1,100 T4-hours, but every chunk is independent, so it
+splits across GPUs: about half a day on 100.
 
 ## 6. What I take from it
 
 Every model I built agrees: once last year's volatility is used properly and the year's level is taken out, the
 FinBERT text adds little, and a neural network adds nothing over a linear model on the same vectors. That is a
-negative result, but a careful one, and it changes how the published results read. The second encoder tests the one
-explanation that is left.
+negative result, but a careful one, and it changes how the published results read. A second encoder trained on
+the same kind of documents gives the same answer, so it is not down to the choice of BERT. The one option left is
+fine-tuning the encoder on the target, which, with the networks already overfitting in two or three epochs, is more
+likely to overfit than to help.
 
 ## References
 
