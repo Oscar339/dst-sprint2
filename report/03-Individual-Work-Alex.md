@@ -25,14 +25,10 @@ I fitted a ridge regression on each report's averaged FinBERT vectors. It is bui
 * **Fitting all years together was a dead end.** The ridge model swung from 26% better than the straight line to 16% worse depending on the year. This shows that it was mostly using the text to guess which era a report came from, and so how volatile the whole market would be that year, rather than which companies would be more volatile than others. Its biggest gain, in 2003, was almost all in the level part of the error, which no single report can know. So the final version only lets the text explain differences between companies in the same year.
 * **Within a year, the text adds little.** The within-year ridge changes the MSE by −1.0% to +0.3% on average
   against the line, helping in 2001 and 2002 and hurting in 2004. In either case, this was not a massively significant impact on performance. In 11 out of 72 fits, the last training year chose to switch the text off.
-* **Ridge only needs a few totals from the data, not every report.** To fit the model, all the ridge needs is a couple of sums over the training reports, such as $X^\top X$ and $X^\top y$. So, I worked these out once for each year and then added up the years each training window covers, which is the map/reduce idea from lecture 09.2. This means that after one pass over the data, each fit takes the same time however many reports there are, and each year could be worked out on a separate machine. In practice, this took the notebook from 45 minutes to 3.
+* **Ridge only needs a few totals from the data, not every report.** To fit the model, all the ridge needs is a couple of sums over the training reports, such as $X^\top X$ and $X^\top y$. So, I worked these out once for each year and then added up the years each training window covers, which is the map/reduce idea from lecture 09.2. This means that after one pass over the data, each fit takes the same time, however many reports there are, and each year could be worked out on a separate machine. In practice, this took the notebook from 45 minutes to 3.
 
 Comparing with the paper gave the result I found most interesting. On Kogan et al.'s own full data and windows, the
-straight line with no text scores 0.1403 for 2006 against 0.1402 for their best text model, so most of their gain over
-copying comes from fitting last year's volatility, not from the text. I also found that the 11% of reports our data
-could not match to EDGAR-CORPUS are the hard ones, with 3 to 6 times the error of copying, so our MSEs are lower than
-the paper's for reasons that have nothing to do with any model. FETILDA's reported 27% gain over Kogan's baseline is
-measured on a different subset of reports, so this could be a similar thing happening.
+straight line with no text scores 0.1403 for 2006 against 0.1402 for their best text model. This suggests that the data in the text may not help much. I also found that the 11% of reports our data could not match to EDGAR-CORPUS are the hard ones, with 3 to 6 times the error of copying, so our MSEs are lower than the paper's for reasons that have nothing to do with any model. FETILDA's reported 27% gain over Kogan's baseline is measured on a different subset of reports, so this could be a similar thing happening.
 
 ## 3. The attention network
 
@@ -60,8 +56,8 @@ comparisons do not.
 
 ## 4. The second encoder
 
-By the decision rule in the plan, the evidence now points at the vectors rather than at how they are combined. Our
-vectors come from `ProsusAI/finbert`, which was tuned for sentence sentiment. Notebook 04 reads Item 7 again with Yang
+After seeing the result from the initial attention model, I thought that the vectors may be holding the model back. Our
+vectors come from `ProsusAI/finbert`, which was tuned for sentence sentiment. We then read Item 7 again with Yang
 et al.'s FinBERT, pre-trained on 10-Ks and analyst reports, keeping both the CLS and the token-average vector of each
 chunk, and reruns the same ridge and attention network on them, changing nothing else.
 
