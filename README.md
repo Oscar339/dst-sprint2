@@ -49,9 +49,9 @@ _To be filled in as the report is written._
 1. `01-Introduction.ipynb` — the question, earlier work, our approach.
 2. `02-Data.ipynb` — the data, how it was joined and checked, and the shared
    train/test years (`data/output/splits.csv`), which later notebooks load.
-3. `03-Individual-Work-Alex.tex` (Alex, LaTeX; references in `references.bib`) — the shared scoring, the linear
-   baseline, the attention network and the second encoder; the working is in
-   `Alex/`.
+3. Alex's individual work (to be added; references in `references.bib`) — the
+   shared scoring, the linear baseline, the attention network, the second
+   encoder and fine-tuning; the working is in `Alex/`.
 4. `04-Scaling.ipynb` (Oscar, with Alex's Colab T4 timings) — FinBERT's speed
    on CPU, laptop GPU and T4, the full runs against the speed tests, and what
    1000× more data would take. Redraws from the saved timings in
