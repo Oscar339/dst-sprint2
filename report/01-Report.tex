@@ -1,0 +1,78 @@
+
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2cm]{geometry}
+\usepackage{amsmath}
+\usepackage{microtype}
+\usepackage[shortlabels]{enumitem}
+\usepackage[round]{natbib}
+\usepackage{graphicx}   % \includegraphics for figures
+\usepackage{booktabs}   % \toprule \midrule \bottomrule for tables
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage[hidelinks]{hyperref}
+
+\setlist[itemize]{leftmargin=1.2em, itemsep=2pt, topsep=3pt}
+\setlength{\parskip}{4pt}
+\setlength{\parindent}{0pt}
+
+% Figures saved by the notebooks live in data/output/
+\graphicspath{{../data/output/}}
+
+% Cross-reference to the supplement, e.g. \supp{02-Data, Fig.~3}
+\newcommand{\supp}[1]{(Supplement: \textit{#1})}
+
+% Visible placeholder; delete each one once the section is written
+\newcommand{\placeholder}[1]{\textcolor{red}{[#1]}}
+
+\title{Does the text of a 10-K predict next year's volatility?\\[2pt]
+       \large Data Science Toolbox, Sprint 2: Data at Scale}
+\author{Oscar Butler \and Alex Robinson \and Louis Mulryan}
+\date{December 2026}
+
+\begin{document}
+\maketitle
+
+% ---------------------------------------------------------------------
+% SHARED PAGES (about 2 pages of text in total for these three sections)
+% ---------------------------------------------------------------------
+
+\section{Introduction}\label{sec:intro}
+% Owner: Oscar.
+\placeholder{Introduction -- Oscar}
+
+\section{Data}\label{sec:data}
+% Owner: to be agreed.
+\placeholder{Data summary -- owner to be agreed}
+
+% ---------------------------------------------------------------------
+% INDIVIDUAL CONTRIBUTIONS (about 2 pages of text each,
+% plus about 1 page of figures/tables each)
+% ---------------------------------------------------------------------
+
+\section{Oscar Butler}\label{sec:oscar}
+\placeholder{Oscar's contribution}
+
+\section{Alex Robinson}\label{sec:alex}
+\placeholder{Alex's contribution}
+
+\section{Louis Mulryan}\label{sec:louis}
+\placeholder{Louis's contribution}
+
+% ---------------------------------------------------------------------
+
+\section{Conclusion}\label{sec:conclusion}
+% Owner: Alex.
+\placeholder{Conclusion -- Alex}
+
+\section*{Use of AI}
+% The brief requires any non-human content in the report to be
+% explicitly attributed. State here how AI was used (supplement only).
+\placeholder{AI statement -- to be agreed}
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

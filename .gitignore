@@ -35,3 +35,17 @@ lightning_logs/
 # Other units' lecture notes: kept locally for reading, cited in the report,
 # never published (the repo is public and the notes aren't ours to share).
 Oscar/references/
+
+# LaTeX build files (the finished PDF IS committed, these are not)
+*.aux
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.synctex.gz
+*.toc
+
+# VS Code settings are personal to each editor
+.vscode/
