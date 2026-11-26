@@ -12,7 +12,8 @@ versions:
 Both work within year (each year's own means removed), so the text only changes how companies are ranked; the
 prediction is the straight line's average for the test year plus the within-year part, so the level is exactly
 the line's. lambda (ridge) or the epoch count (network) is chosen on the last training year, then the model is
-refitted on the whole window, as in 02.
+refitted on the whole window, as in 02. make_ridge(..., pooled=True) is the exception: all training years are
+fitted together, as 02's pooled ridge, so the model predicts each test year's level as well.
 """
 import copy
 import time
@@ -44,24 +45,31 @@ def ridge_path(Z, t, alphas):
     return V @ (q[:, None] / (np.clip(eig, 0, None)[:, None] + np.asarray(alphas)[None, :]))   # p x len(alphas)
 
 
-def fit_ridge(kind, X, x, y, years, alphas, b=None):
-    """One within-year fit on these rows. kind: 'two-step', 'joint' or 'no text'.
-    Returns sd (text standardisation), beta (text, p x len(alphas)) and gamma (slope on x, per alpha)."""
+def fit_ridge(kind, X, x, y, years, alphas, b=None, pooled=False):
+    """One fit on these rows. kind: 'two-step', 'joint' or 'no text'.
+    Within year (default), each year's own means are removed; pooled, the window's overall means are, so the
+    intercept is unpenalised and the model also predicts the year's level.
+    Returns sd (text standardisation), beta (text, p x len(alphas)) and gamma (slope on x, per alpha); pooled
+    fits also keep the training means, which the prediction needs."""
+    if pooled:                                 # one group: centre on the whole window's means
+        years = np.zeros(len(x), dtype=int)
     xc, yc = centre(x, years), centre(y, years)
+    mu = {"pooled": pooled, "y": float(np.mean(y)), "x": float(np.mean(x)),
+          "X": np.asarray(X, dtype=np.float64).mean(axis=0) if (pooled and X is not None) else None}
     if kind == "no text":
-        return {"sd": None, "beta": None, "gamma": np.full(len(alphas), (xc @ yc) / (xc @ xc))}
+        return {"sd": None, "beta": None, "gamma": np.full(len(alphas), (xc @ yc) / (xc @ xc)), "mu": mu}
     Xc = centre(X, years)
     sd = np.sqrt((Xc ** 2).mean(axis=0)) + 1e-12   # population sd of the within-year inputs, as ridge_sums.py
     Z = Xc / sd
-    if kind == "two-step":                     # the text explains the line's within-year residual; slope fixed at b
-        return {"sd": sd, "beta": ridge_path(Z, yc - b * xc, alphas), "gamma": np.full(len(alphas), b)}
+    if kind == "two-step":                     # the text explains the line's residual; slope fixed at b
+        return {"sd": sd, "beta": ridge_path(Z, yc - b * xc, alphas), "gamma": np.full(len(alphas), b), "mu": mu}
     if kind != "joint":
         raise ValueError(kind)
     # joint, x unpenalised: remove x from y and from every column of Z (Frisch-Waugh-Lovell), ridge on the rest
     k = xc @ xc
     Zt, yt = Z - np.outer(xc, (xc @ Z) / k), yc - xc * (xc @ yc) / k
     beta = ridge_path(Zt, yt, alphas)
-    return {"sd": sd, "beta": beta, "gamma": (xc @ yc - (xc @ Z) @ beta) / k}
+    return {"sd": sd, "beta": beta, "gamma": (xc @ yc - (xc @ Z) @ beta) / k, "mu": mu}
 
 
 def within_part(model, X, x, years, j=0):
@@ -72,8 +80,19 @@ def within_part(model, X, x, years, j=0):
     return p
 
 
-def make_ridge(df, X, kind, alphas=ALPHAS, log=None, tag=""):
-    """A predict(df, train, test) for scoring.evaluate."""
+def pooled_prediction(model, X, x, j=0):
+    """A pooled fit's full prediction (level included): the training means plus the fitted deviations."""
+    mu = model["mu"]
+    p = mu["y"] + model["gamma"][j] * (x - mu["x"])
+    if model["beta"] is not None:
+        p = p + ((X - mu["X"]) / model["sd"]) @ model["beta"][:, j]
+    return p
+
+
+def make_ridge(df, X, kind, alphas=ALPHAS, log=None, tag="", pooled=False):
+    """A predict(df, train, test) for scoring.evaluate. pooled=True fits all training years together (no
+    within-year centring), so the model also predicts the test year's level; lambda is then chosen on the
+    last training year's raw MSE rather than its within-year MSE."""
     x_all, y_all, yr_all = df["logvol_before"].to_numpy(), df["logvol_after"].to_numpy(), df["year"].to_numpy()
 
     def predict(df_, train, test):
@@ -83,16 +102,23 @@ def make_ridge(df, X, kind, alphas=ALPHAS, log=None, tag=""):
         a, b = scoring.fit_line(df_, train)
         _, b_s = scoring.fit_line(df_, sub)    # lambda: fit on all but the last year (with their own line), score it
         grid = alphas if kind != "no text" else alphas[:1]
-        m_s = fit_ridge(kind, *rows(sub), grid, b_s)
+        m_s = fit_ridge(kind, *rows(sub), grid, b_s, pooled=pooled)
         Xv, xv, yv, yrv = rows(val)
-        yv_c = centre(yv, yrv)
-        j = int(np.argmin([np.mean((yv_c - within_part(m_s, Xv, xv, yrv, j)) ** 2) for j in range(len(grid))]))
-        m = fit_ridge(kind, *rows(train), grid[j:j + 1], b)
+        if pooled:
+            curve = [np.mean((yv - pooled_prediction(m_s, Xv, xv, j)) ** 2) for j in range(len(grid))]
+        else:
+            yv_c = centre(yv, yrv)
+            curve = [np.mean((yv_c - within_part(m_s, Xv, xv, yrv, j)) ** 2) for j in range(len(grid))]
+        j = int(np.argmin(curve))
+        m = fit_ridge(kind, *rows(train), grid[j:j + 1], b, pooled=pooled)
         Xt, xt, _, yrt = rows(test)
         if log is not None:
-            log.append({"model": kind, "input": tag, "test_year": int(yrt[0]), "train_years": f"{years[0]}-{years[-1]}",
+            log.append({"model": kind, "input": tag, "pooled": pooled, "test_year": int(yrt[0]),
+                        "train_years": f"{years[0]}-{years[-1]}",
                         "alpha": float(grid[j]) if kind != "no text" else np.nan,
                         "line_slope": b, "fitted_slope": float(m["gamma"][0])})
+        if pooled:
+            return pooled_prediction(m, Xt, xt)
         return np.mean(a + b * xt) + within_part(m, Xt, xt, yrt)
     return predict
 
