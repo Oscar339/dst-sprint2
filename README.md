@@ -34,6 +34,20 @@ correctness of the methods, and the robustness of the conclusions.
 
 Equity: _to be agreed before the work gets underway_ (the brief asks for this).
 
+### Who wrote which part of the report
+
+`report/01-Report.pdf` is written as a single paper, so authorship is recorded
+here rather than in the report. _Proposed; to be confirmed by all three of us._
+
+| Section of `01-Report` | Author |
+|---|---|
+| 1 Introduction | Oscar Butler |
+| 2 Data | Oscar Butler |
+| 3 Methods | Alex Robinson, Louis Mulryan _(split to be agreed)_ |
+| 4 Results | Alex Robinson, Louis Mulryan _(split to be agreed)_ |
+| 5 Computational performance | Oscar Butler (using Alex's Colab T4 timings) |
+| 6 Discussion and conclusion | Alex Robinson |
+
 ## Domain and data
 
 _To be chosen._ Document the search for data as we go in
