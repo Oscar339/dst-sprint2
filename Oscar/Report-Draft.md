@@ -88,4 +88,18 @@ where $\bar{y}$, $s^2$ and $n$ are each group's sample mean, variance and size, 
 | No EDGAR-CORPUS match | 28,286 | 2,179 | 3.6% | 0.09 |
 | For any reason | 27,142 | 3,323 | −1.8% | 0.25 |
 
-Neither difference was significant at the 5% level, so we kept 89% of the corpus without introducing a statisitcally significant bias.
+Neither difference was significant at the 5% level, so we kept 89% of the corpus without introducing a statistically significant bias.
+
+The one thing that remained was to choose which source to use for Item 7 of the report. Recall that we had extracts from both Kogan and EDGAR and that these were extracted with different software, Kogan's header-matching script and EDGAR-CORPUS's parser. We found that the two sources mostly agreed: the median of the length ratio (EDGAR/Kogan) was 0.94 and 88% of reports fell within 0.5–2×. The exceptions were that EDGAR was much shorter for 9.2% and much longer for 2.4%. We investigated some examples of both cases. We identified the following:
+
+*Table 3: How the two extractions of Item 7 go wrong.*
+
+| What goes wrong | Example | Which source is right |
+|---|---|---|
+| Kogan stops early at a cross-reference ("...as discussed in note # of") | Newmont Gold (1997), Woodward Governor (2006) | EDGAR-CORPUS |
+| EDGAR-CORPUS runs past the end of Item 7 into the exhibit list | Blockbuster (2002) | Kogan |
+| The company leaves Item 7 to its *Annual Report to Shareholders* ("incorporated by reference"), so EDGAR-CORPUS's section is only a few lines long | Northeast Utilities (2005) | Kogan, which found the text in the exhibit |
+
+Thus we decided on the following strategy:
+1. FinBERT read EDGAR's Item 7 by default because it is clean text with headings (like FinBERT's training text) and comes from the same parser as Item 1.
+2. We fell back to Kogan's copy when EDGAR's had under 100 words, which occurred in 2.2% of reports.

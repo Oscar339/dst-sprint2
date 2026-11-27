@@ -149,7 +149,28 @@ where $\bar{y}$, $s^2$ and $n$ are each group's sample mean, variance and size, 
 
 Neither difference was significant at the 5\% level, so we kept 89\% of the corpus without introducing a statistically significant bias \supp{02-Data, \S2}.
 
-\placeholder{Choosing the source of Item 7}
+The one thing that remained was to choose which source to use for Item 7 of the report. Recall that we had extracts from both Kogan and EDGAR and that these were extracted with different software, Kogan's header-matching script and EDGAR-CORPUS's parser. We found that the two sources mostly agreed: the median of the length ratio (EDGAR/Kogan) was 0.94 and 88\% of reports fell within 0.5--2$\times$. The exceptions were that EDGAR was much shorter for 9.2\% and much longer for 2.4\%. We investigated some examples of both cases. We identified the following (Table~\ref{tab:item7}):
+
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{How the two extractions of Item 7 go wrong.}\label{tab:item7}
+  \begin{tabular}{@{}p{7.0cm}p{4.6cm}p{4.4cm}@{}}
+    \toprule
+    What goes wrong & Example & Which source is right \\
+    \midrule
+    Kogan stops early at a cross-reference (``\ldots as discussed in note \# of'') & Newmont Gold (1997), Woodward Governor (2006) & EDGAR-CORPUS \\
+    EDGAR-CORPUS runs past the end of Item 7 into the exhibit list & Blockbuster (2002) & Kogan \\
+    The company leaves Item 7 to its \textit{Annual Report to Shareholders} (``incorporated by reference''), so EDGAR-CORPUS's section is only a few lines long & Northeast Utilities (2005) & Kogan, which found the text in the exhibit \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Thus we decided on the following strategy:
+\begin{enumerate}
+  \item FinBERT read EDGAR's Item 7 by default because it is clean text with headings (like FinBERT's training text) and comes from the same parser as Item 1.
+  \item We fell back to Kogan's copy when EDGAR's had under 100 words, which occurred in 2.2\% of reports.
+\end{enumerate}
 
 \subsection{The volatility labels}\label{sec:data-labels}
 \placeholder{Label checks: extreme labels, comparison with Yahoo}
