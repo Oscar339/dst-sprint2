@@ -129,7 +129,48 @@ Kogan's corpus contains only Item 7 of each report, so we take the rest of the t
 \placeholder{Period covered, Item 1A, delisted firms, CRSP access}
 
 \section{Methods}\label{sec:methods}
-\placeholder{Baseline and scoring; ridge; attention network; MLP; encoders; fine-tuning}
+
+Initially, we fitted a straight line on last year's volatility first and then fitted the text to what it got wrong, but in every final model, we fitted last year's volatility and the text together. This is the correct way to measure what the text adds beyond last year's volatility, because fitting them one after the other fixes the weight on last year's volatility before the text is seen. Fitting them together also gave a lower MSE on both windows. Some comparison runs were only done with the text fitted after the straight line (two-step), and these are labelled as such. For every network, once early stopping has chosen the number of epochs, we refit the model on the whole training window, including the last training year.
+
+\subsection{Scoring}\label{sec:methods-scoring}
+
+For each test year, each model predicts the volatility of each company's shares over the 12 months after its report. Each prediction is then checked against the true volatility, and scored by the mean squared error (MSE) on log volatility, as seen in \citet{kogan2009}.
+
+An MSE on its own does not necessarily say whether a model is good or bad. So, to give each model something to beat, we built two baselines that do not use the text at all and scored them on the same test reports. The first is copying last year's volatility, as seen in \citet{kogan2009}. The second is a straight line, which is an ordinary least-squares fit of next year's volatility on last year's volatility, without text. This line uses the same information as every model apart from the text. However, the models also fit their own weight on last year's volatility, so some of their gain over the line could come from this rather than from the text. To check this, we also fitted the within-year slope on last year's volatility with no text. This only lowers the MSE by 0.5\% on the paper window and 0.0\% on the strict window, so nearly all of the models' gains must come from the text. To check whether a difference in MSE is real rather than chance, we used a paired bootstrap over the test reports.
+
+We split each test year's MSE into two parts,
+\[
+  \text{MSE} = \bar e^{\,2} + \frac{1}{n}\sum_{i=1}^{n} (e_i - \bar e)^2 .
+\]
+The first part, the level, is how far off the model is on the whole year's volatility. The second, the spread, is how well the model ranks the companies within the year. This is what the text could help with. For the straight line, the level is 44\% of the MSE in 2003 and 30\% in 2001, so a model can look much better or worse depending on the year.
+
+\subsection{The linear baseline}\label{sec:methods-ridge}
+
+We then fitted a ridge regression on each report's averaged FinBERT vectors. It is fitted at the same time as the weight on last year's volatility, which is not penalised. A ridge model is the simplest model that uses the text, and it is the same as a neural network with no hidden layer. This creates another benchmark that the attention network and MLP would have to beat to prove that they are useful.
+
+We found that fitting all years together didn't help. On Item 7, it lowers the MSE by 5.9\% on the paper window, against 3.8\% within year. However, all of this gain comes from the level in 2003 and 2004. This means that it was using the text to guess the year rather than to tell companies apart. On the strict window, this gain disappears, and the pooled model also ranks companies worse. The final version therefore only uses the text within each year. Ridge regression only needs $X^\top X$ and $X^\top y$, so, following the map/reduce idea from Lecture 09.2 \citep{dst092}, we computed these once per year and summed them for each training window.
+
+Fitting the text and last year's volatility together made a large difference. Fitted jointly, the within-year ridge lowered the MSE by 3.8\% on the paper window and 2.3\% on the strict window, compared to 1.0\% and 0.0\% when the text is fitted after the straight line. This is because part of the text tells us the same thing as last year's volatility. When the line is fitted first, it takes the credit for this shared part, so the text can only help with what is left over. When they are fitted together, the Frisch--Waugh--Lovell theorem shows that the text is judged on the part of it that the volatility of last year cannot explain.
+
+Comparing this model with the paper gave an interesting result. In \citeauthor{kogan2009}'s data and training window, the straight line without text scores 0.1403 for 2006 against 0.1402 for their best model that uses the text. This suggests that the data in the text may not help much. We also found that the 11\% of reports that our data could not match to EDGAR-CORPUS \citep{loukas2021} are the hardest reports to predict, with 3 to 6 times the error of copying, so leaving them out lowers our scores. FETILDA \citep{xia2022} reported a 27\% gain over \citeauthor{kogan2009}'s baseline but measured on a different subset of reports. What we are seeing could be a similar thing happening.
+
+\subsection{The attention network}\label{sec:methods-attention}
+
+Rather than giving every chunk the same weight, the attention model keeps each report's chunk vectors separate and uses attention pooling. It assigns each chunk a score, converts the scores to weights with a softmax, and predicts the within-year volatility from the weighted average of the chunk vectors, with its own unpenalised weight on last year's volatility. For the softmax, the ReLU and tanh layers, and the training loop, we closely followed the lectures and Workshop 06.3 \citep{dst063}, with early stopping, dropout and weight decay.
+
+On Item 7, the attention network lowers the MSE by 3.9\% on the paper window and 1.9\% on the strict window, against 3.8\% and 2.3\% for the ridge. This is level on the paper window and slightly worse on the strict window, but both differences are within the spread between seeds, which is about 1.2 to 1.4 percentage points per year. So, on the ProsusAI vectors, the attention network still does no better than ridge.
+
+To compare different versions of the network, we trained four versions (attention pooling on Item 7, on Item 1 and on both sections, and mean pooling on Item 7), each with 5 seeds, 2 windows and 6 test years, giving 240 runs. These runs were done before the joint fit, so they are two-step. No model variant did much better than the within-year ridge fitted in the same way. Learning the chunk weights also added little, since attention beat mean pooling by only 0.3\%, less than the spread between seeds. The learnt weights are close to equal, with an effective number of chunks 78\% of the actual number. Therefore, attention pooling behaves almost like mean pooling. The model did favour Item 7, placing 78\% of its weight there when given both sections, even though Item 7 makes up only 62\% of the chunks. Item 1 on its own did worse than the straight line. Since none of these versions did much better than attention pooling on Item 7, this was the only version we refitted jointly.
+
+We also refitted the model on the last training year once the number of epochs had been chosen, since early stopping holds that year back. This improved the network by 0.7\% on the paper window and 0.1\% on the strict window.
+
+\subsection{The second encoder}\label{sec:methods-encoder}
+
+After seeing the results of the attention network, we thought that the vectors themselves could be limiting how much the models gain over the no-text benchmarks. Our vectors come from ProsusAI/finbert, which was tuned to judge the sentiment of sentences, so they mostly capture tone. Therefore, we re-encoded Item 7 with the FinBERT of \citet{yang2020}, which was pre-trained on 10-Ks and analyst reports. Then, we reran the same ridge regression and attention network on the new vectors. For each chunk, we kept both the CLS vector and the mean of the token vectors, since, without fine-tuning, the CLS vector is not trained to summarise the chunk.
+
+Yang's vectors beat ProsusAI's by about 0.7 to 1.2 percentage points on the paper window, and by up to 0.7 on the strict window. The ridge model improved by $-4.5\%$ and $-2.6\%$ on Yang's CLS vectors, and the attention network got $-5.1\%$ and $-2.6\%$ on Yang's token averages. So, the new encoder helped, although only modestly. When the text was fit after the straight line, the two encoders gave similar results, so the two-step fit hid this difference. Choosing the CLS or the token-average vector made little difference. For the attention network, they are level on the paper window, and the token average is slightly better on the strict window ($-2.6\%$ against $-2.0\%$).
+
+\placeholder{MLP (Louis); fine-tuning (Alex, after 05b)}
 
 \section{Results}\label{sec:results}
 \placeholder{Comparisons against the baseline}
