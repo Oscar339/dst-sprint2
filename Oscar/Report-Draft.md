@@ -63,27 +63,29 @@ We now move on to selecting what items to analyse from the reports themselves. R
 Kogan's corpus contains only Item 7 of each report, so we take the rest of the text from EDGAR-CORPUS \citep{loukas2021}, a dataset of 10-K sections extracted from EDGAR. From it we take Item 1, and a second copy of Item 7 that we use to check Kogan's extraction (Section 2.2). This approach also lets us use Kogan's published scores as a benchmark. We also considered Bloomberg, which is available only in person and whose data cannot be shared publicly; WRDS, which provides CRSP but at Bristol is restricted to Business and Economics masters students; and an extension of Kogan's corpus to 2013 by researchers at NCCU, which we could not download \supp{02-Data, §1}.
 
 2.2:
-Kogan's reports are matched to the EDGAR-COPRUS on the company's SEC number (CIK) and the filing year. We find 95 companies that filed two 10-K reports in one calendar year, for simplicitiy, we remove both copies of these duplicates. We observe that EDGAR-CORPUS is about 14 GB, thus we stream the data and keep only item 1 and 7 of the reports for which we are able to confirm a match with Kogan. This brings the size of the dataset down to a few hundred MB, a much more managable task for our available compute. Kogan's company name appears in the EDGAR text for 98.9% of matched reports with the other cases caused primarily by spelling differences (e.g. "Applebee's" against "APPLEBEES").
+Kogan's reports were matched to EDGAR-CORPUS on the company's SEC number (CIK) and the filing year. Kogan's company name appeared in the EDGAR text for 98.9% of matched reports, with the other cases caused primarily by spelling differences (e.g. "Applebee's" against "APPLEBEES"). We found 95 companies that filed two 10-K reports in one calendar year. Since EDGAR-CORPUS identifies a report only by company and year, we could not tell which of the two filings its text belonged to, so we removed both copies of these duplicates. EDGAR-CORPUS is about 14 GB, so we streamed the data and kept only Items 1 and 7 of the reports for which we were able to confirm a match with Kogan. This brought the size of the dataset down to a few hundred MB, a much more manageable task for our available compute. There were also 1,989 cases where EDGAR-CORPUS had no 10-K at all for that company and year, along with 1,144 cases where we were able to identify a match but Item 1 was too short to be useful (fewer than 100 words). In both cases, we cut these data points.
 
-Its worth confirming here if 
+This left us with 27,142 of the original 30,465 (89%) Kogan reports, with the drop in any single year never exceeding 13%. Given the near miss with survivorship bias caused by Yahoo, we again investigated whether the dropped reports had a different risk profile. We ran a Welch t-test on next year's log volatility $y$. Writing $\mu_{\text{kept}}$ and $\mu_{\text{lost}}$ for the mean of $y$ over the kept and lost reports, we tested
 
+$$
+H_0:\ \mu_{\text{kept}} = \mu_{\text{lost}}
+\qquad \text{against} \qquad
+H_1:\ \mu_{\text{kept}} \neq \mu_{\text{lost}}
+$$
 
+using the statistic
 
+$$
+t = \frac{\bar{y}_{\text{lost}} - \bar{y}_{\text{kept}}}{\sqrt{\dfrac{s_{\text{kept}}^2}{n_{\text{kept}}} + \dfrac{s_{\text{lost}}^2}{n_{\text{lost}}}}},
+\qquad
+\nu = \frac{\left(\dfrac{s_{\text{kept}}^2}{n_{\text{kept}}} + \dfrac{s_{\text{lost}}^2}{n_{\text{lost}}}\right)^2}{\dfrac{\left(s_{\text{kept}}^2/n_{\text{kept}}\right)^2}{n_{\text{kept}}-1} + \dfrac{\left(s_{\text{lost}}^2/n_{\text{lost}}\right)^2}{n_{\text{lost}}-1}},
+$$
 
+where $\bar{y}$, $s^2$ and $n$ are each group's sample mean, variance and size, and $t$ is compared with a $t$-distribution on $\nu$ degrees of freedom. Unlike Student's t-test, Welch's test does not assume the two groups have the same variance, which suits groups as unequal in size as ours. We ran the test once for the reports lost because EDGAR-CORPUS had no match, and once for all lost reports. Since $y$ is a logarithm, $100\left(e^{\bar{y}_{\text{lost}} - \bar{y}_{\text{kept}}} - 1\right)$ gives how much more volatile the lost reports were as a percentage.
 
+| Reports lost | $n_{\text{kept}}$ | $n_{\text{lost}}$ | Lost reports more volatile by | $p$ |
+|---|---|---|---|---|
+| No EDGAR-CORPUS match | 28,286 | 2,179 | 3.6% | 0.09 |
+| For any reason | 27,142 | 3,323 | −1.8% | 0.25 |
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+Neither difference was significant at the 5% level, so we kept 89% of the corpus without introducing a statisitcally significant bias.
