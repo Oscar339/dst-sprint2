@@ -136,3 +136,46 @@ which correspond to a daily volatility $\sigma$ below $e^{-5} \approx 0.7\%$ (ca
 The very low reports turned out to be takeovers. Once a company has agreed to be bought for a fixed cash price, its shares trade just below that price until the deal closes, so its measured volatility collapses. 69% of these reports contain takeover wording, compared with 17% of ordinary reports, and only 4% of the companies filed again the following year. Most describe the company's own sale, for example DEKALB to Monsanto and Odwalla to Coca-Cola. Importantly, these companies were not risk free, they were about to be delisted. The very high reports were the opposite case of companies being in distress. 82% contain distress wording, such as a going-concern warning from the auditors or a Chapter 11 filing (e.g. Salon Media and eMagin). Unlike the takeovers, these companies were already very volatile the year before (a median of 158%).
 
 Since these are genuine prices rather than data errors, we kept them. It's worth noting that they matter far more than their numbers suggest. The 70 very low reports make up only 0.26% of the data but carry 10% of the baseline's squared error, and removing them alone would cut the baseline MSE from 0.128 to 0.116. They are also where the text has the clearest chance of beating the baseline, since a report announcing "an agreement and plan of merger" says something about next year that we would not otherwise have known from just last year's volatility.
+
+
+2.4
+
+The last step was transform our large blocks of text into something a model can learn from. For this we used FinBERT \citep{araci2019}, a version of BERT trained further on financial text. We did not change FinBERT itself; we only used it to read the reports, and the models in Section 3 were trained on what it produced. This is a good use case for transfer learning, FinBERT has already learnt from far more text than our 27,142 reports, so we reuse what it knows rather than learning the language from scratch.
+
+FinBERT can only read 512 tokens at a time, where a token is a word or a piece of a word, and our reports are much longer than this. So for each report we treated Item 1 and Item 7 separately and did the following:
+
+1. Split the text into FinBERT's own tokens.
+2. Cut the tokens into consecutive chunks of 510, since two of the 512 slots are taken by FinBERT's start and end markers.
+3. Kept at most 64 chunks per section, recording the true number.
+4. Passed each chunk through FinBERT and kept its CLS vector, the 768 numbers FinBERT uses to summarise the whole chunk.
+
+*Table 5: Chunks per report.*
+
+| Section | Median chunks | 90th percentile | Reports cut at 64 | Chunks stored |
+|---|---|---|---|---|
+| Item 1 | 14 | 31 | 0.27% | 444,394 |
+| Item 7 | 16 | 33 | 0.57% | 498,607 |
+
+A typical report gave 32 chunks in total, and fewer than 1% of reports were cut at 64 chunks, so the cap lost very little text. We saved the vectors at half precision (float16), which halves the storage to about 1.4 GB for all 943,001 chunks. Reading every report took FinBERT about 11 hours on a laptop GPU, so we did this once and every model then reused the saved vectors \supp{02-Data, \S6}. The ridge regression averages a report's chunks into a single vector, while the attention network keeps them separate and learns how much weight to give each one (Section 3).
+
+It's worth noting that the reports changed over the decade. The median length of item 7 roughly doubled in this time, with the steepest rise around the Sarbanes–Oxley Act of 2002, which tightened reporting standards, and \citet{kogan2009} note the same jump. 
+
+This matters for how we split the data into training and test sets. Volatility moves with the market as a whole - it was high around the 2000–2002 crash and low by 2005. If we split the reports at random, a model could learn each year's market sentiment from that year's own reports, and look better than it really is. So, following \citet{kogan2009}, we split by year. Every model was trained only on earlier years and tested on one year at a time, from 2001 to 2006, apart from the fine-tuned FinBERT, which was tested on 2006 only. This also lets us compare our scores directly with the paper's.
+
+However, there is one subtlety. A report filed in December 2005 has a label covering December 2005 to December 2006, which overlaps the 2006 test year. Training on it leaks a little information about 2006's market into the model. We therefore used two training windows:
+
+- **Paper:** the five years before the test year, as in \citet{kogan2009}, for direct comparison.
+- **Strict:** the four years ending two years before the test year, so that no training label overlaps the test period.
+
+*Table 6: Training and test years. Train/test give the number of reports.*
+
+| Test year | Paper window | Train | Strict window | Train | Test |
+|---|---|---|---|---|---|
+| 2001 | 1996–2000 | 9,747 | 1996–1999 | 7,596 | 2,299 |
+| 2002 | 1997–2001 | 10,788 | 1997–2000 | 8,489 | 2,587 |
+| 2003 | 1998–2002 | 11,399 | 1998–2001 | 8,812 | 3,217 |
+| 2004 | 1999–2003 | 12,474 | 1999–2002 | 9,257 | 3,168 |
+| 2005 | 2000–2004 | 13,422 | 2000–2003 | 10,254 | 3,121 |
+| 2006 | 2001–2005 | 14,392 | 2001–2004 | 11,271 | 3,003 |
+
+The strict window trains on about a fifth fewer reports, and the training years end further from the test year, so we expect every model to score a little worse on it. If a model's gain over the baseline holds up on the strict window, we can be more confident it comes from the text rather than from leaked information about the test year's market. Within each window, we tuned hyperparameters on the last training year and never on the test year. Every model read its splits from the same file, so all of them were scored on exactly the same reports \supp{02-Data, \S7}.
