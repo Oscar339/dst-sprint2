@@ -1,0 +1,2 @@
+device,train_chunks_per_second,predict_chunks_per_second,peak_memory_gb,minutes_per_epoch_estimate
+cuda,36.52830203903957,155.3017652432342,3.041563034057617,28.021534870545796
