@@ -103,3 +103,6 @@ The one thing that remained was to choose which source to use for Item 7 of the 
 Thus we decided on the following strategy:
 1. FinBERT read EDGAR's Item 7 by default because it is clean text with headings (like FinBERT's training text) and comes from the same parser as Item 1.
 2. We fell back to Kogan's copy when EDGAR's had under 100 words, which occurred in 2.2% of reports.
+
+2.3
+With regards to the volatility labels, we first checked 
