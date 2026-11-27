@@ -27,13 +27,13 @@ y = \log \sigma\text{.}
 $$
 Here $y$ is called the log volatility. We use both the log volatility and the log returns as these often play nicer than their standard equivalents. For example, one useful property is the volatilities of companies are right-skewed, applying a log to volatility turns this into a more familiar normal-ish distribution \citep{andersen2001}. They also carry the benefit of allowing us to compare our results directly to the paper this report is inspired by \citep{kogan2009}.
 
-As a rule of thumb, the volatility of a company's returns are relatively consistent each year. This is because 'risky' stocks tend to have idiosyncratic properties that persist over time that make them more prone to risk than other stocks. For example the volatility of NVIDIA will almost always be higher than that of PepsiCo. This is because people will always drink Pepsi but AI infrastructure demand remains a hot topic of debate.
+As a rule of thumb, the volatility of a company's returns are relatively consistent each year \citep{engle1982}. This is because 'risky' stocks tend to have idiosyncratic properties that persist over time that make them more prone to risk than other stocks. For example the volatility of NVIDIA will almost always be higher than that of PepsiCo. This is because people will always drink Pepsi but AI infrastructure demand remains a hot topic of debate.
 
 With this in mind, predicting the next year's volatility for a company based on just the volatility of previous years is a simple and effective method. We will use this as the baseline and investigate how adding information about a company's SEC filings changes prediction accuracy. Following Kogan et al. (2009), we predict the log of volatility and score models by their mean squared error (MSE).
 
-We use about 27,000 10-K reports from 1996 to 2006. We start by building a ridge regression, the simplist model we can build that looks at the text. Then we build an attention network and an Multi Layer Perceptron (MLP) in an attempt to beat this baseline. We also experiment with different encoders to determine the effect of different tokenisation techiniques on text understanding.
+We use about 27,000 10-K reports from 1996 to 2006. We start by building a ridge regression, the simplist model we can build that looks at the text. Then we build an attention network and an Multi Layer Perceptron (MLP) in an attempt to beat this baseline. We also experiment with different encoders to determine the effect of the encoder's pre-training on text understanding.
 
-Its worth noting hre that even a negative result is informative. If we find that including the text of the 10-K filings does not improve prediction accuracy then this implies something potentially more interesting. It would suggest that the information in the report is already reflected in how the share price has moved, and so is already contained in last year's volatility. This is what one would expect in an efficient market, where the price of a stock should reflect all publicly available information. This is a theme that we will return to throughout the report as we discover many of our models do not yield significant improvements over the baseline. **[TODO: add numbers once models are trained]**
+Its worth noting hre that even a negative result is informative. If we find that including the text of the 10-K filings does not improve prediction accuracy then this implies something potentially more interesting. It would suggest that the information in the report is already reflected in how the share price has moved, and so is already contained in last year's volatility. This is what one would expect in an efficient market, where the price of a stock should reflect all publicly available information \citep{fama1970}. This is a theme that we will return to throughout the report as we discover many of our models do not yield significant improvements over the baseline. **[TODO: add numbers once models are trained]**
 
 data:
 
@@ -43,7 +43,7 @@ The simplest strategy is to take the text of the 10-K reports from EDGAR and com
 
 To combat this, we instead rely on the 10-K corpus of \citet{kogan2009}, which covers reports filed from 1996 to 2006. For each report it gives the log volatility over the year before filing, which is our baseline input, and over the year after, which is our target. These labels were computed from CRSP (the Center for Research in Security Prices), the standard academic price database, which keeps a company's prices after it is delisted. 
 
-We now move on to selecting what items to analyse from the reports themselves. Refereing to fig ____ we chose to work with only items 1 and 7. Whilst including the entire reports in our analysis is a potential area for further exploration [potential link to later section on scalability] we elect to work with just these as they show the most promise and every extra section costs more time to extract the text.
+We now move on to selecting what items to analyse from the reports themselves. Referring to fig ____ we chose to work with only Items 1 and 7. Whilst including the entire reports in our analysis is a potential area for further exploration (Section 5) we elect to work with just these as they show the most promise and every extra section costs more time to extract the text.
 
 ** Note: item 1 defo already priced in, hence limited improvment
 
@@ -51,7 +51,7 @@ We now move on to selecting what items to analyse from the reports themselves. R
 
 | Item | Contents | Used | Reason |
 |---|---|---|---|
-| 1 Business | What the firm does: products, customers, competitors | Yes | Industry and business model drive much of a firm's risk (Hoberg & Phillips, 2016) |
+| 1 Business | What the firm does: products, customers, competitors | Yes | Describes products and competitors well enough to define a firm's industry (Hoberg & Phillips, 2016) |
 | 7 MD&A | Management's review of the year and its outlook | Yes | Used by Kogan et al.; looks forward as well as back; the most studied section (Li, 2010; Brown & Tucker, 2011) |
 | 1A Risk Factors | Management's own list of its main risks | No | Informative (Kravet & Muslu, 2013), but mandatory only from late 2005 (SEC, 2005) |
 | 7A Market Risk | Exposure to interest rates, currencies, commodities | No | Mostly sensitivity tables; often already inside Kogan's Item 7 |
@@ -63,7 +63,7 @@ We now move on to selecting what items to analyse from the reports themselves. R
 Kogan's corpus contains only Item 7 of each report, so we take the rest of the text from EDGAR-CORPUS \citep{loukas2021}, a dataset of 10-K sections extracted from EDGAR. From it we take Item 1, and a second copy of Item 7 that we use to check Kogan's extraction (Section 2.2). This approach also lets us use Kogan's published scores as a benchmark. We also considered Bloomberg, which is available only in person and whose data cannot be shared publicly; WRDS, which provides CRSP but at Bristol is restricted to Business and Economics masters students; and an extension of Kogan's corpus to 2013 by researchers at NCCU, which we could not download \supp{02-Data, §1}.
 
 2.2:
-Kogan's reports were matched to EDGAR-CORPUS on the company's SEC number (CIK) and the filing year. Kogan's company name appeared in the EDGAR text for 98.9% of matched reports, with the other cases caused primarily by spelling differences (e.g. "Applebee's" against "APPLEBEES"). We found 95 companies that filed two 10-K reports in one calendar year. Since EDGAR-CORPUS identifies a report only by company and year, we could not tell which of the two filings its text belonged to, so we removed both copies of these duplicates. EDGAR-CORPUS is about 14 GB, so we streamed the data and kept only Items 1 and 7 of the reports for which we were able to confirm a match with Kogan. This brought the size of the dataset down to a few hundred MB, a much more manageable task for our available compute. There were also 1,989 cases where EDGAR-CORPUS had no 10-K at all for that company and year, along with 1,144 cases where we were able to identify a match but Item 1 was too short to be useful (fewer than 100 words). In both cases, we cut these data points.
+Kogan's reports were matched to EDGAR-CORPUS on the company's SEC number (CIK) and the filing year. Kogan's company name appeared in the EDGAR text for 98.9% of matched reports, with the other cases caused primarily by spelling differences (e.g. "Applebee's" against "APPLEBEES"). We found 95 cases where a company filed two 10-K reports in one calendar year. Since EDGAR-CORPUS identifies a report only by company and year, we could not tell which of the two filings its text belonged to, so we removed both copies of these duplicates. EDGAR-CORPUS is about 14 GB, so we streamed the data and kept only Items 1 and 7 of the reports for which we were able to confirm a match with Kogan. This brought the size of the dataset down to a few hundred MB, a much more manageable task for our available compute. There were also 1,989 cases where EDGAR-CORPUS had no 10-K at all for that company and year, along with 1,144 cases where we were able to identify a match but Item 1 was too short to be useful (fewer than 100 words). In both cases, we cut these data points.
 
 This left us with 27,142 of the original 30,465 (89%) Kogan reports, with the drop in any single year never exceeding 13%. Given the near miss with survivorship bias caused by Yahoo, we again investigated whether the dropped reports had a different risk profile. We ran a Welch t-test on next year's log volatility $y$. Writing $\mu_{\text{kept}}$ and $\mu_{\text{lost}}$ for the mean of $y$ over the kept and lost reports, we tested
 
@@ -81,7 +81,7 @@ t = \frac{\bar{y}_{\text{lost}} - \bar{y}_{\text{kept}}}{\sqrt{\dfrac{s_{\text{k
 \nu = \frac{\left(\dfrac{s_{\text{kept}}^2}{n_{\text{kept}}} + \dfrac{s_{\text{lost}}^2}{n_{\text{lost}}}\right)^2}{\dfrac{\left(s_{\text{kept}}^2/n_{\text{kept}}\right)^2}{n_{\text{kept}}-1} + \dfrac{\left(s_{\text{lost}}^2/n_{\text{lost}}\right)^2}{n_{\text{lost}}-1}},
 $$
 
-where $\bar{y}$, $s^2$ and $n$ are each group's sample mean, variance and size, and $t$ is compared with a $t$-distribution on $\nu$ degrees of freedom. Unlike Student's t-test, Welch's test does not assume the two groups have the same variance, which suits groups as unequal in size as ours. We ran the test once for the reports lost because EDGAR-CORPUS had no match, and once for all lost reports. Since $y$ is a logarithm, $100\left(e^{\bar{y}_{\text{lost}} - \bar{y}_{\text{kept}}} - 1\right)$ gives how much more volatile the lost reports were as a percentage.
+where $\bar{y}$, $s^2$ and $n$ are each group's sample mean, variance and size, and $t$ is compared with a $t$-distribution on $\nu$ degrees of freedom. Unlike Student's t-test, Welch's test \citep{welch1947} does not assume the two groups have the same variance, which suits groups as unequal in size as ours. We ran the test once for the reports lost because EDGAR-CORPUS had no match, and once for all lost reports. Since $y$ is a logarithm, $100\left(e^{\bar{y}_{\text{lost}} - \bar{y}_{\text{kept}}} - 1\right)$ gives how much more volatile the lost reports were as a percentage.
 
 | Reports lost | $n_{\text{kept}}$ | $n_{\text{lost}}$ | Lost reports more volatile by | $p$ |
 |---|---|---|---|---|
@@ -140,7 +140,7 @@ Since these are genuine prices rather than data errors, we kept them. It's worth
 
 2.4
 
-The last step was transform our large blocks of text into something a model can learn from. For this we used FinBERT \citep{araci2019}, a version of BERT trained further on financial text. We did not change FinBERT itself; we only used it to read the reports, and the models in Section 3 were trained on what it produced. This is a good use case for transfer learning, FinBERT has already learnt from far more text than our 27,142 reports, so we reuse what it knows rather than learning the language from scratch.
+The last step was transform our large blocks of text into something a model can learn from. For this we used FinBERT \citep{araci2019}, a version of BERT \citep{devlin2019} trained further on financial text. We did not change FinBERT itself; we only used it to read the reports, and the models in Section 3 were trained on what it produced. This is a good use case for transfer learning, FinBERT has already learnt from far more text than our 27,142 reports, so we reuse what it knows rather than learning the language from scratch.
 
 FinBERT can only read 512 tokens at a time, where a token is a word or a piece of a word, and our reports are much longer than this. So for each report we treated Item 1 and Item 7 separately and did the following:
 
@@ -156,7 +156,7 @@ FinBERT can only read 512 tokens at a time, where a token is a word or a piece o
 | Item 1 | 14 | 31 | 0.27% | 444,394 |
 | Item 7 | 16 | 33 | 0.57% | 498,607 |
 
-A typical report gave 32 chunks in total, and fewer than 1% of reports were cut at 64 chunks, so the cap lost very little text. We saved the vectors at half precision (float16), which halves the storage to about 1.4 GB for all 943,001 chunks. Reading every report took FinBERT about 11 hours on a laptop GPU, so we did this once and every model then reused the saved vectors \supp{02-Data, \S6}. The ridge regression averages a report's chunks into a single vector, while the attention network keeps them separate and learns how much weight to give each one (Section 3).
+A typical report gave 32 chunks in total, and fewer than 1% of reports were cut at 64 chunks, so the cap lost very little text. We saved the vectors at half precision (float16), which halves the storage to about 1.4 GB for all 943,001 chunks. Reading every report took FinBERT about 12 hours on a laptop GPU, so we did this once and every model then reused the saved vectors \supp{02-Data, \S6}. The ridge regression averages a report's chunks into a single vector, while the attention network keeps them separate and learns how much weight to give each one (Section 3).
 
 It's worth noting that the reports changed over the decade. The median length of item 7 roughly doubled in this time, with the steepest rise around the Sarbanes–Oxley Act of 2002, which tightened reporting standards, and \citet{kogan2009} note the same jump. 
 
@@ -164,8 +164,8 @@ This matters for how we split the data into training and test sets. Volatility m
 
 However, there is one subtlety. A report filed in December 2005 has a label covering December 2005 to December 2006, which overlaps the 2006 test year. Training on it leaks a little information about 2006's market into the model. We therefore used two training windows:
 
-- **Paper:** the five years before the test year, as in \citet{kogan2009}, for direct comparison.
-- **Strict:** the four years ending two years before the test year, so that no training label overlaps the test period.
+- Paper: the five years before the test year, as in \citet{kogan2009}, for direct comparison.
+- Strict: the four years ending two years before the test year, so that no training label overlaps the test period.
 
 *Table 6: Training and test years. Train/test give the number of reports.*
 
@@ -179,3 +179,55 @@ However, there is one subtlety. A report filed in December 2005 has a label cove
 | 2006 | 2001–2005 | 14,392 | 2001–2004 | 11,271 | 3,003 |
 
 The strict window trains on about a fifth fewer reports, and the training years end further from the test year, so we expect every model to score a little worse on it. If a model's gain over the baseline holds up on the strict window, we can be more confident it comes from the text rather than from leaked information about the test year's market. Within each window, we tuned hyperparameters on the last training year and never on the test year. Every model read its splits from the same file, so all of them were scored on exactly the same reports \supp{02-Data, \S7}.
+
+
+5: **[FIRST DRAFT WRITTEN BY CLAUDE — to edit]** Computational cost and scaling (proposed new name for Section 5)
+
+Almost all of our computation went into one step, FinBERT reading the text. FinBERT is a 110-million-parameter network (the BERT-base architecture of \citet{devlin2019}), and it had to read all 943,001 chunks. The attention network, on the other hand, only works on the saved 768-number summaries, and one epoch of it took about six seconds on a Colab T4 GPU. So, when we ask how our approach scales, we are really asking how the reading step scales. We investigated this by timing FinBERT on a laptop's CPU, its GPU (an Apple M3) and a Colab T4, at different precisions and batch sizes \supp{04-Scaling}.
+
+*Table 7: FinBERT's speed in chunks per second. The T4 was timed on Yang et al.'s FinBERT, which has the same architecture as ours and so does the same work per chunk.*
+
+| Machine | Precision | Speed test | Full run |
+|---|---|---|---|
+| Laptop CPU | fp32 | 10 | – |
+| Laptop GPU (M3) | fp32 | 22 | – |
+| Laptop GPU (M3) | fp16 | 26 | 22 |
+| Colab T4 | fp16 | 158 | 118 |
+
+The T4 was about 6 times faster than the laptop's GPU, which in turn was only 2–3 times faster than its CPU. Using half precision (fp16) instead of 32-bit numbers sped the laptop up by about 19% and halved the size of the saved output, since 16-bit numbers take half the memory and GPUs can process them faster \citep{micikevicius2018}. A check on 50 reports found no measurable change to the vectors. We also found that batch size barely mattered on either GPU. One 510-token chunk is already enough work to keep the GPUs busy, so feeding them more chunks at once adds nothing. We also timed FinBERT on 32 up to 1,024 chunks and found that the time grows linearly with the number of chunks ($R^2 = 0.997$), with no measurable start-up cost. FinBERT therefore costs a fixed price per chunk.
+
+It's worth noting that both full runs were slower than their speed tests, each for different reasons. The laptop ran at its speed-test rate for the first hour and a half, then dropped by about 15% and stayed there for the remaining ten hours. This is likely due to thermal throttling although we did not record the temperature to confirm it. The T4 ran at a steady rate throughout, so heat was not the issue. Instead, for each batch of reports, Colab first read the text and split it into tokens on its CPU, and only then sent it to the GPU, so the GPU sat idle while the CPU worked. If the GPU alone reads $g$ chunks per second and the CPU step prepares $p$, then done one after the other the rate is
+
+$$
+\text{rate} = \frac{1}{1/g + 1/p}.
+$$
+
+With $g = 158$ and the measured rate of 118, this gives $p \approx 460$ chunks per second. This matters for scaling, because the CPU step does not get faster when the GPU does, so the faster the GPU, the larger the share of time it spends waiting. This is Amdahl's law \citep{amdahl1967,dst091}. Two simple fixes would remove it: run the CPU step alongside the GPU, as PyTorch's `DataLoader` does, so that the rate becomes $\min(g, p)$, and tokenise the text once in advance, storing 2-byte token ids instead of text.
+
+Next, we looked at how far our data could realistically grow. Our corpus is only a part of what exists. Counting the SEC's own index of every filing, 249,368 10-Ks were filed from 1996 to 2025, and in 2002–2006 Kogan's corpus covered only about a third of them (34%). This is because it only keeps companies whose shares CRSP prices and whose Item 7 Kogan's script could find. We also measured how long recent reports are, using a sample of EDGAR-CORPUS \citep{loukas2021} for 2006, 2013 and 2020. Items 1 and 7 barely grew, from a mean of about 11,600 words to 13,600, while the whole 10-K grew from about 30,800 words to 43,900, mostly because the Risk Factors section (Item 1A) tripled in length. Since FinBERT costs a fixed price per chunk, the cost of each larger dataset follows directly from its number of chunks (Table 8) \supp{04-Scaling, \S6}.
+
+*Table 8: Realistic ways to grow the data, and the brief's 1000 times. Times are for one Colab T4 at the rate of our full run (118 chunks per second).*
+
+| Data | Reports | Times our data | One T4 | FinBERT output |
+|---|---|---|---|---|
+| Our corpus (Kogan's companies, 1996–2006) | 27,142 | 1 | 2 hours | 1.4 GB |
+| Our companies, extended to 2025 | 78,635 | 3.3 | 7 hours | 4.8 GB |
+| Every 10-K filer, 1996–2025 | 249,368 | 10 | 22 hours | 15 GB |
+| Every 10-K filer, whole 10-K | 249,368 | 30 | 2.7 days | 43 GB |
+| The brief's 1000 times | 27 million | 1000 | 93 days | 1.45 TB |
+
+Extending our companies up to today, adding every company that files a 10-K, and even reading every section of every report all run on a single GPU in under three days. So for any realistic version of this study, the computing is not the problem. The real limit is the labels. Every report needs a volatility label, which means daily prices for every company, including the ones that were later delisted. Kogan's labels stop in 2006, and the only source that keeps delisted companies is CRSP, which at Bristol is only available through WRDS to Business and Economics masters students. As we saw in Section 2.1, Yahoo Finance would have labelled only 26% of the reports and lost the riskier ones. Not every filer has traded shares either (for example funds, trusts and companies that have only issued debt), so "every 10-K filer" is an upper bound on what could ever be labelled. With access to CRSP, though, a study of every company up to today would cost about a day of GPU time.
+
+The brief also asks how our approach would cope with 1000 times more data. This is about 27 million reports, far more 10-Ks than have ever been filed, so it would mean adding other text, such as quarterly 10-Q reports, 8-K filings, earnings-call transcripts and news. Since the cost is linear, this would take about 93 days on one T4, and produce about 1.45 TB of FinBERT output. However, no chunk needs another chunk's result, so the reading step is a map with a trivial reduce \citep{dst092}. Each GPU can read its own share of the chunks, and the reduce only collects each report's vectors back together. With $N$ GPUs,
+
+$$
+\text{time}(N) = \text{start-up} + \frac{\text{input size}}{\text{bandwidth}} + \frac{\text{chunks}}{N \times \text{rate per GPU}},
+$$
+
+where the first two terms do not shrink as GPUs are added. Assuming the input comes from one shared store at 1 GB/s (an assumption, not a measurement), 1,024 T4s would read 1000 times our data in about 2.3 hours, at 71% of perfect efficiency, or 1.9 hours and 86% if they read pre-tokenised ids. Beyond this point the shared store becomes the limit, and the fix is to split the data as well as the work, with each worker reading its own shard from its own disk, as Spark or MapReduce do \citep{dean2004}.
+
+Training the models that use the saved vectors would not need a cluster. Even at 1000 times the data, one epoch of the attention network would take about 1.6 hours on a single T4. The word-count models scale in a similar way. Their word-count matrix takes 0.19 GB stored sparsely, which would be about 190 GB at 1000 times the data. This is too big to hold in memory, but it is easy to split into shards. Counting the words took 91 seconds on one CPU core, which would be about 25 hours at 1000 times, or under half an hour on 64 cores.
+
+Fine-tuning is the exception. Here FinBERT itself is trained, so every chunk has to go through the network forwards and backwards on every step. On a T4 this ran at about 40 chunks per second, a quarter of the speed of only reading the text. Even reading just 4 random chunks per report on each step, one epoch took 19 minutes. A single test year with a single seed took about 1.5 GPU-hours, against about 15 minutes for all 60 runs of the attention network on Yang's saved vectors. At 1000 times the data, one epoch would be about 45 million training chunks, or about 310 T4-hours. Unlike reading, the training steps are not independent, since every step updates the same 110 million weights. The work can still be split by giving each GPU part of every batch (data parallelism), but after every step the gradients have to be added up across all the GPUs and sent back. This is a reduce whose cost grows with the number of GPUs \citep{dst092}, so fine-tuning scales much less well than reading. Since in our one test it did not clearly beat the models on frozen vectors (Section 3), it is hard to justify at this scale.
+
+These estimates have clear limits. We tested one laptop and one type of cloud GPU, the T4 figures come from Yang's FinBERT rather than ours, the storage bandwidth is assumed, fine-tuning was timed on one test year and one seed, the growth after 2006 assumes we keep the same share of filers and comes from a sample of three years, and the larger figures extend a straight line that we only measured up to about a million chunks.
