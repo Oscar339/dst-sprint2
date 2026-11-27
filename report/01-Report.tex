@@ -221,7 +221,7 @@ We also refitted the model on the last training year once the number of epochs h
 
 After seeing the results of the attention network, we thought that the vectors themselves could be limiting how much the models gain over the no-text benchmarks. Our vectors come from ProsusAI/finbert, which was tuned to judge the sentiment of sentences, so they mostly capture tone. Therefore, we re-encoded Item 7 with the FinBERT of \citet{yang2020}, which was pre-trained on 10-Ks and analyst reports. Then, we reran the same ridge regression and attention network on the new vectors. For each chunk, we kept both the CLS vector and the mean of the token vectors, since, without fine-tuning, the CLS vector is not trained to summarise the chunk.
 
-Yang's vectors beat ProsusAI's by about 0.7 to 1.2 percentage points on the paper window, and by up to 0.7 on the strict window. The ridge model improved by $-4.5\%$ and $-2.6\%$ on Yang's CLS vectors, and the attention network got $-5.1\%$ and $-2.6\%$ on Yang's token averages. So, the new encoder helped, although only modestly. When the text was fit after the straight line, the two encoders gave similar results, so the two-step fit hid this difference. Choosing the CLS or the token-average vector made little difference. For the attention network, they are level on the paper window, and the token average is slightly better on the strict window ($-2.6\%$ against $-2.0\%$).
+Yang's vectors beat ProsusAI's by about 0.7 to 1.2 percentage points on the paper window, and by up to 0.7 on the strict window. The ridge model improved to $-4.5\%$ and $-2.6\%$ on Yang's CLS vectors, and the attention network got $-5.1\%$ and $-2.6\%$ on Yang's token averages. So, the new encoder helped, although only modestly. When the text was fit after the straight line, the two encoders gave similar results, so the two-step fit hid this difference. Choosing the CLS or the token-average vector made little difference. For the attention network, they are level on the paper window, and the token average is slightly better on the strict window ($-2.6\%$ against $-2.0\%$).
 
 \placeholder{MLP (Louis); fine-tuning (Alex, after 05b)}
 
@@ -232,8 +232,41 @@ Yang's vectors beat ProsusAI's by about 0.7 to 1.2 percentage points on the pape
 \placeholder{Cost of FinBERT; full runs against the speed tests; what 1000$\times$ more data would take}
 
 \section{Discussion and conclusion}\label{sec:conclusion}
-\placeholder{Discussion and conclusion}
 
+\subsection{The data}
+
+The first challenge of the project was the labels, not the text. Computing volatility ourselves from Yahoo Finance would only have labelled 26\% of reports, and the reports we lost were about 23\% more volatile, so we used \citeauthor{kogan2009}'s CRSP labels instead. Matching these to EDGAR-CORPUS kept 27,142 of the 30,465 reports (89\%), and neither Welch t-test found a significant difference between the reports we kept and the ones we lost. However, the lost reports are not harmless for scoring. They are the hardest reports to predict, with 3 to 6 times the error of copying last year's volatility, so leaving them out lowers our MSE. This means that our scores cannot be compared directly with \citeauthor{kogan2009}'s, and only the changes against a baseline on the same reports should be compared. This is why every model in this report is scored against the straight line on exactly the same test reports.
+
+\subsection{What made the difference}
+
+The choice of model made very little difference. Once last year's volatility and the text were fitted together, and the text was only used within each year, the ridge regression, the attention network and the MLP all lowered the MSE by about a similar amount. The differences in accuracy between the models are within the spread between seeds, which is about $1.2$ to $1.4\%$ per year. So, the hidden layers of the networks did not find anything in the vectors that the ridge model could not.
+
+What did make a difference was how the text was fitted and how it was turned into numbers. Fitting the text after the straight line made it seem as though the text did not help, with the ridge model only getting $-1.0\%$ and $0.0\%$, against $-3.8\%$ and $-2.3\%$ when fitted jointly. Another difference arose from fitting all years together. This looked better on the paper window, but the extra gain came from guessing the level of the whole year's volatility, and disappeared on the strict window. Within year, FinBERT's vectors lowered the MSE by about 4\% on the paper window, against $-0.2\%$ to $-2.4\%$ for word counts, and the FinBERT of \citet{yang2020}, pre-trained on 10-Ks, did better again at up to $-5.1\%$. So, the representation of the text matters much more than the model built on top of it.
+\placeholder{Fine-tuning (Alex, 05b): does fine-tuning Yang's FinBERT jointly beat the frozen vectors? Two-step result was $-1.5\%$ in 2006, behind every joint frozen model}
+
+\placeholder{Fine-tuning (Alex, 05b): does fine-tuning Yang's FinBERT jointly beat the frozen vectors? Two-step result was $-1.5\%$ in 2006, behind every joint frozen model}
+
+\subsection{Cost and scalability}
+
+Almost all of the computational time is spent reading the text. Reading our 27,142 reports took 12 hours on a laptop, and would have taken around two hours on a Colab T4. In comparison, one epoch of the attention network on the saved vectors takes about six seconds. The cost grows proportionally to the amount of text, so 1000 times more data would take about 70 days on a T4. However, every chunk is read on its own, so the reading step is a map with a trivial reduce, and splits well across many GPUs. On 1,024 T4s, it would take approximately two hours, so this is scalable. Since the ridge model does as well as the networks, we would choose it as the model to use. It is also cheap to scale, since it only needs $X^\top X$ and $X^\top y$ from each year, which can be computed separately and then summed, in the same way as the reading step.
+\placeholder{Fine-tuning cost (05b): time per epoch on a T4, and what this would mean at 1000$\times$}
+
+\subsection{What this means financially}
+
+A 4 to 5\% fall in MSE sounds small, but volatility forecasts are used to guide very large amounts of capital. On the paper window, the typical error of the straight line is about 43\% of the true volatility, and our best model brings this down to about 41\%. Since the price of an at-the-money option moves roughly in proportion to volatility, this is also roughly the improvement in pricing for such an option.  
+\placeholder{check this rough option-pricing claim and decide whether to keep it}
+
+It is just as important to know where the gain comes from. Most of it comes from ranking companies within each year, and little from predicting the level of the whole market's volatility. So, the text tells us which companies will be riskier than others in the same year, but not whether next year will be a volatile year. This makes it most useful for comparing companies, for example in portfolio construction or relative-value trading, rather than for timing the market. It also fits with what we would expect in an efficient market. Most of what can be predicted is already in last year's volatility, and the text only adds a little on top. We saw the same thing on \citeauthor{kogan2009}'s own data, where their best text model scores 0.1402 in 2006, almost exactly the same as the 0.1403 of the straight line with no text.
+
+\subsection{Limitations and next steps}
+
+Our data covers 1996 to 2006, so it does not include the financial crisis, and we do not know whether the text would help more or less in a crisis. Item 1A (Risk Factors) only became mandatory in late 2005, so we could not use it, even though it is the section most directly about risk. We also left out the 11\% of reports that we could not match, which are the hardest to predict. Our encoders were frozen in every model except the fine-tuned one, which was only run on one test year with one seed. Finally, many of the differences between models are smaller than the spread between seeds, so we cannot rank models that are within about a point of each other.
+
+There are three clear next steps. Firstly, we would extend the data past 2006. This would let us include Item 1A and the financial crisis. Secondly, we would fine-tune the encoder jointly on more test years and seeds \placeholder{update once 05b is done}. Finally, we would add other text, such as 8-K filings or earnings-call transcripts. This would give the models more to work with, and would also test our scaling estimates.
+
+\subsection{Does the text help?}
+
+Yes, but only a little, and only when it is used in the right way. This means fitting the text and last year's volatility together, and only using the text within each year. When we do this, the text lowers the MSE by around 4\% to 5\% on the paper window and 2\% to 2.6\% on the strict window, compared to the straight line. All of this comes from ranking companies within each year. The model used made little difference, but how the text was represented did. FinBERT clearly beat word counts, and the FinBERT pre-trained on 10-Ks beat the one tuned for sentiment.
 \section*{Use of AI}
 % Confirm with Alex and Louis that this is true of their sections too.
 The text in this report was written by the authors. AI (Claude Code, by Anthropic) was also used to set up the \LaTeX{} template, to convert our drafts into \LaTeX{}, to make small edits (reordering paragraphs, minor rewording so that those edits read smoothly, and correcting typos) and to fact-check statements against the supplement. Code and annotations in the supplement were written with AI assistance.
