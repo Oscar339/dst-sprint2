@@ -104,5 +104,35 @@ Thus we decided on the following strategy:
 1. FinBERT read EDGAR's Item 7 by default because it is clean text with headings (like FinBERT's training text) and comes from the same parser as Item 1.
 2. We fell back to Kogan's copy when EDGAR's had under 100 words, which occurred in 2.2% of reports.
 
-2.3
-With regards to the volatility labels, we first checked 
+
+2.3:
+
+Since every one of our models is trained to predict Kogan's labels, it was important to perform a few quick sense checks. Recall from the Introduction that the label $y$ is the log of the standard deviation of daily log returns over the 12 months after filing, with the same quantity over the 12 months before filing used as our baseline input. We first checked that the labels were complete and consistent. Every report had a before label and an after label. The labels in our final dataset matched Kogan's raw files for 100% of reports, and there were no missing or infinite values.
+
+Next we checked that the labels looked sensible (Figure 3). Figure 3(a) plots each report's volatility after filing against its volatility before. The points lie close to the diagonal, with a correlation of 0.83, which is exactly why last year's volatility is such a strong baseline and why beating it is hard. Figure 3(b) compares the companies with the market as a whole. Here, and in Table 4 below, we quote volatility per year rather than per day, as is standard in finance. Since daily returns are close to independent, their variances add up over the year, so the annual volatility is
+
+$$
+\sigma_{\text{annual}} = \sqrt{252}\,\sigma \approx 15.9\,\sigma.
+$$
+
+The median company had a volatility of 50% a year, against 17% for the S&P 500 over the same 12 months, so a typical company was about three times as volatile as the index. This is what we would expect, since a single firm's own news does not average out in the way it does across 500 companies (Campbell et al., 2001).
+
+Both tails of Figure 3(b) stretch a long way, so we looked at the extreme reports individually. We defined these as
+
+$$
+\text{very low: } y < -5, \qquad \text{very high: } y > -1.5,
+$$
+
+which correspond to a daily volatility $\sigma$ below $e^{-5} \approx 0.7\%$ (calmer than the S&P 500, whose median is about 1.1% a day) and above $e^{-1.5} \approx 22\%$, where a single day's move of 20% was typical. In annual terms, these thresholds are about 11% and 350% a year. We searched each report's text for takeover wording (e.g. "agreement and plan of merger", "tender offer") and distress wording (e.g. "going concern", "Chapter 11"), and checked whether the company filed another 10-K the following year (Table 4).
+
+*Table 4: The extreme labels. Volatilities are annualised medians; the last three columns are the share of reports in each group.*
+
+| Group | Reports | Volatility before | Volatility after | Takeover wording | Distress wording | Filed next year |
+|---|---|---|---|---|---|---|
+| Very low | 70 | 39% | 6% | 69% | 29% | 4% |
+| Ordinary | 27,034 | 53% | 50% | 17% | 31% | 78% |
+| Very high | 38 | 158% | 424% | 24% | 82% | 13% |
+
+The very low reports turned out to be takeovers. Once a company has agreed to be bought for a fixed cash price, its shares trade just below that price until the deal closes, so its measured volatility collapses. 69% of these reports contain takeover wording, compared with 17% of ordinary reports, and only 4% of the companies filed again the following year. Most describe the company's own sale, for example DEKALB to Monsanto and Odwalla to Coca-Cola. Importantly, these companies were not risk free, they were about to be delisted. The very high reports were the opposite case of companies being in distress. 82% contain distress wording, such as a going-concern warning from the auditors or a Chapter 11 filing (e.g. Salon Media and eMagin). Unlike the takeovers, these companies were already very volatile the year before (a median of 158%).
+
+Since these are genuine prices rather than data errors, we kept them. It's worth noting that they matter far more than their numbers suggest. The 70 very low reports make up only 0.26% of the data but carry 10% of the baseline's squared error, and removing them alone would cut the baseline MSE from 0.128 to 0.116. They are also where the text has the clearest chance of beating the baseline, since a report announcing "an agreement and plan of merger" says something about next year that we would not otherwise have known from just last year's volatility.

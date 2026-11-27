@@ -173,7 +173,44 @@ Thus we decided on the following strategy:
 \end{enumerate}
 
 \subsection{The volatility labels}\label{sec:data-labels}
-\placeholder{Label checks: extreme labels, comparison with Yahoo}
+Since every one of our models is trained to predict Kogan's labels, it was important to perform a few quick sense checks. Recall from the Introduction that the label $y$ is the log of the standard deviation of daily log returns over the 12 months after filing, with the same quantity over the 12 months before filing used as our baseline input. We first checked that the labels were complete and consistent. Every report had a before label and an after label. The labels in our final dataset matched Kogan's raw files for 100\% of reports, and there were no missing or infinite values.
+
+\begin{figure}[ht]
+  \centering
+  \includegraphics[width=\textwidth, trim={0 0 0 26bp}, clip]{fig3_labels.png}
+  \caption{The volatility labels. (a) Log volatility in the 12 months after filing against the 12 months before; the dashed line marks no change. (b) Log volatility after filing across all reports, with the median company and the median of the S\&P 500 over the same 12 months.}\label{fig:labels}
+\end{figure}
+
+Next we checked that the labels looked sensible (Figure~\ref{fig:labels}). Figure~\ref{fig:labels}(a) plots each report's volatility after filing against its volatility before. The points lie close to the diagonal, with a correlation of 0.83, which is exactly why last year's volatility is such a strong baseline and why beating it is hard. Figure~\ref{fig:labels}(b) compares the companies with the market as a whole. Here, and in Table~\ref{tab:extremes} below, we quote volatility per year rather than per day, as is standard in finance. Since daily returns are close to independent, their variances add up over the year, so the annual volatility is
+\[
+\sigma_{\text{annual}} = \sqrt{252}\,\sigma \approx 15.9\,\sigma.
+\]
+The median company had a volatility of 50\% a year, against 17\% for the S\&P 500 over the same 12 months, so a typical company was about three times as volatile as the index. This is what we would expect, since a single firm's own news does not average out in the way it does across 500 companies \citep{campbell2001}.
+
+Both tails of Figure~\ref{fig:labels}(b) stretch a long way, so we looked at the extreme reports individually. We defined these as
+\[
+\text{very low: } y < -5, \qquad \text{very high: } y > -1.5,
+\]
+which correspond to a daily volatility $\sigma$ below $e^{-5} \approx 0.7\%$ (calmer than the S\&P 500, whose median is about 1.1\% a day) and above $e^{-1.5} \approx 22\%$, where a single day's move of 20\% was typical. In annual terms, these thresholds are about 11\% and 350\% a year. We searched each report's text for takeover wording (e.g.\ ``agreement and plan of merger'', ``tender offer'') and distress wording (e.g.\ ``going concern'', ``Chapter 11''), and checked whether the company filed another 10-K the following year (Table~\ref{tab:extremes}).
+
+\begin{table}[ht]
+  \centering
+  \small
+  \caption{The extreme labels. Volatilities are annualised medians; the last three columns are the share of reports in each group.}\label{tab:extremes}
+  \begin{tabular}{@{}lrrrrrr@{}}
+    \toprule
+    Group & Reports & \begin{tabular}[b]{@{}r@{}}Volatility\\before\end{tabular} & \begin{tabular}[b]{@{}r@{}}Volatility\\after\end{tabular} & \begin{tabular}[b]{@{}r@{}}Takeover\\wording\end{tabular} & \begin{tabular}[b]{@{}r@{}}Distress\\wording\end{tabular} & \begin{tabular}[b]{@{}r@{}}Filed\\next year\end{tabular} \\
+    \midrule
+    Very low & 70 & 39\% & 6\% & 69\% & 29\% & 4\% \\
+    Ordinary & 27,034 & 53\% & 50\% & 17\% & 31\% & 78\% \\
+    Very high & 38 & 158\% & 424\% & 24\% & 82\% & 13\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The very low reports turned out to be takeovers. Once a company has agreed to be bought for a fixed cash price, its shares trade just below that price until the deal closes, so its measured volatility collapses. 69\% of these reports contain takeover wording, compared with 17\% of ordinary reports, and only 4\% of the companies filed again the following year. Most describe the company's own sale, for example DEKALB to Monsanto and Odwalla to Coca-Cola. Importantly, these companies were not risk free, they were about to be delisted. The very high reports were the opposite case of companies being in distress. 82\% contain distress wording, such as a going-concern warning from the auditors or a Chapter 11 filing (e.g.\ Salon Media and eMagin). Unlike the takeovers, these companies were already very volatile the year before (a median of 158\%).
+
+Since these are genuine prices rather than data errors, we kept them. It's worth noting that they matter far more than their numbers suggest. The 70 very low reports make up only 0.26\% of the data but carry 10\% of the baseline's squared error, and removing them alone would cut the baseline MSE from 0.128 to 0.116. They are also where the text has the clearest chance of beating the baseline, since a report announcing ``an agreement and plan of merger'' says something about next year that we would not otherwise have known from just last year's volatility \supp{02-Data, \S4--5}.
 
 \subsection{From text to model input, and the training and test years}\label{sec:data-input}
 \placeholder{FinBERT chunking; splitting by year; paper and strict windows}
@@ -232,10 +269,6 @@ Yang's vectors beat ProsusAI's by about 0.7 to 1.2 percentage points on the pape
 \placeholder{Cost of FinBERT; full runs against the speed tests; what 1000$\times$ more data would take}
 
 \section{Discussion and conclusion}\label{sec:conclusion}
-
-\subsection{The data}
-
-The first challenge of the project was the labels, not the text. Computing volatility ourselves from Yahoo Finance would only have labelled 26\% of reports, and the reports we lost were about 23\% more volatile, so we used \citeauthor{kogan2009}'s CRSP labels instead. Matching these to EDGAR-CORPUS kept 27,142 of the 30,465 reports (89\%), and neither Welch t-test found a significant difference between the reports we kept and the ones we lost. However, the lost reports are not harmless for scoring. They are the hardest reports to predict, with 3 to 6 times the error of copying last year's volatility, so leaving them out lowers our MSE. This means that our scores cannot be compared directly with \citeauthor{kogan2009}'s, and only the changes against a baseline on the same reports should be compared. This is why every model in this report is scored against the straight line on exactly the same test reports.
 
 \subsection{What made the difference}
 
